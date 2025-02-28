@@ -5,12 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>מערכת איסוף נתונים רפואיים</title>
     <link rel="stylesheet" href="styles.css">
-    <!-- להוסיף ב-head לפני תגית הסגירה </head> -->
-    <link rel="stylesheet" href="styles.css">
     <link rel="stylesheet" href="styles-dark.css">
     <!-- Font Awesome לאייקונים -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
-    <!-- קישור לקבצי JavaScript המשופרים -->
+    <!-- קישור לקבצי JavaScript -->
     <script src="components/formComponents.js" defer></script>
     <script src="utils/offlineManager.js" defer></script>
 </head>
@@ -99,33 +97,46 @@
                 <div class="summary-box">
                     <h3>סיכום אנמנזה</h3>
                     <p id="summary-text"></p>
+                    <!-- כפתור העתקה -->
+                    <button id="copy-summary" class="copy-button">
+                        <i class="fas fa-copy"></i> העתק סיכום
+                    </button>
                 </div>
+                <!-- כפתור לסיום בלי צורך בדוא"ל -->
                 <div class="form-group">
-                    <label for="doctor-email">כתובת דוא"ל של הרופא/ה:</label>
-                    <input type="email" id="doctor-email" required>
+                    <button id="complete-summary" class="btn-success">סיים וחזור להתחלה</button>
+                </div>
+                
+                <!-- אופציונלי - שליחה לרופא -->
+                <div class="form-group optional-section">
+                    <label for="doctor-email">כתובת דוא"ל של הרופא/ה (אופציונלי):</label>
+                    <input type="email" id="doctor-email">
                 </div>
             </div>
             <div class="button-group">
                 <button id="back-to-step3" class="secondary">חזור</button>
-                <button id="send-summary">שלח לרופא/ה</button>
+                <button id="send-summary">סיים או שלח לרופא/ה</button>
             </div>
         </div>
 
-        <!-- שלב 5: אישור שליחה -->
+        <!-- שלב 5: אישור סיום -->
         <div id="step5" class="step">
-            <h2>הסיכום נשלח בהצלחה</h2>
-            <p>הסיכום נשלח בהצלחה לרופא/ה.</p>
+            <h2>התהליך הושלם בהצלחה</h2>
+            <p>הסיכום זמין להעתקה.</p>
             <div class="summary-box">
-                <h3>סיכום ששלחנו:</h3>
+                <h3>הסיכום שהופק:</h3>
                 <p id="final-summary-text"></p>
+                <button id="copy-final-summary" class="copy-button">
+                    <i class="fas fa-copy"></i> העתק סיכום
+                </button>
             </div>
             <div class="button-group">
                 <div></div> <!-- שומר מקום -->
-                <button id="start-new" class="secondary">התחל רשומה חדשה</button>
+                <button id="start-new" class="btn-primary">התחל רשומה חדשה</button>
             </div>
         </div>
     </div>
 
-    
+    <script src="app.js"></script>
 </body>
 </html>

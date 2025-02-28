@@ -1,151 +1,9 @@
+// public/app.js
 
 // מצב הנוכחי של המערכת
 const state = {
     currentStep: 1,
     patientRecord: null
-};
-
-// מערכת איסוף נתונים רפואיים - כאן יבוא הקוד שהגדרנו קודם
-const MedicalDataSystem = {
-    // מאגר תלונות נפוצות
-    commonComplaints: [
-        "כאב גרון",
-        "כאב ראש",
-        "כאב בטן",
-        "כאב גב",
-        "שיעול",
-        "קוצר נשימה",
-        "סחרחורת",
-        "בחילה",
-        "הקאות",
-        "פריחה בעור",
-        "חום",
-        "חולשה כללית",
-        "כאב אוזניים",
-        "כאב חזה",
-        "אחר"
-    ],
-    
-    // מאגר שאלות סטנדרטיות לפי תלונה עיקרית
-    standardQuestions: {
-        "כאב גרון": [
-            "כמה זמן נמשך הכאב?",
-            "האם יש חום?",
-            "האם יש קושי בבליעה?",
-            "האם יש צרידות?",
-            "האם נוטל/ת תרופות כלשהן?"
-        ],
-        "כאב ראש": [
-            "כמה זמן נמשך הכאב?",
-            "היכן ממוקם הכאב?",
-            "האם יש חום?",
-            "האם יש בחילה או הקאות?",
-            "האם הכאב מפריע לשינה?"
-        ],
-        "כאב בטן": [
-            "כמה זמן נמשך הכאב?",
-            "היכן ממוקם הכאב?",
-            "האם יש שינויים ביציאות?",
-            "האם יש הקאות?",
-            "האם יש חום?"
-        ],
-        "כאב גב": [
-            "כמה זמן נמשך הכאב?",
-            "היכן ממוקם הכאב בדיוק?",
-            "האם הכאב מקרין לרגליים?",
-            "האם יש חולשה או נימול ברגליים?",
-            "האם הכאב משתנה עם תנועה או מנוחה?"
-        ],
-        // ניתן להוסיף תלונות נוספות בהמשך
-    },
-    
-    // פונקציה ליצירת רשומת מטופל חדשה
-
-            
-    createPatientRecord: function(age, gender, mainComplaint) {
-        return {
-            patientInfo: {
-                age: age,
-                gender: gender,
-                mainComplaint: mainComplaint,
-                timestamp: new Date().toISOString()
-            },
-            standardAnswers: {},
-            dynamicAnswers: {},
-            summary: ""
-        };
-    },
-    
-    // פונקציה לקבלת שאלות סטנדרטיות לפי תלונה
-    getStandardQuestions: function(complaint) {
-        return this.standardQuestions[complaint] || [];
-    },
-    
-    // פונקציה לשמירת תשובות לשאלות סטנדרטיות
-    saveStandardAnswers: function(patientRecord, answers) {
-        patientRecord.standardAnswers = answers;
-        return patientRecord;
-    },
-    
-    // פונקציה לשליחת בקשה לשרת לקבלת שאלות דינמיות (שלב 3)
-    getDynamicQuestions: async function(patientRecord) {
-        const response = await fetch('/api/dynamic-questions', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(patientRecord)
-        });
-        
-        if (!response.ok) {
-            throw new Error('שגיאה בקבלת שאלות דינמיות');
-        }
-        
-        const data = await response.json();
-        return data.questions; // צפוּי מערך של שאלות
-    },
-    
-    // פונקציה לשמירת תשובות לשאלות דינמיות
-    saveDynamicAnswers: function(patientRecord, answers) {
-        patientRecord.dynamicAnswers = answers;
-        return patientRecord;
-    },
-    
-    // פונקציה ליצירת סיכום אנמנזה (שלב 4 - קריאה לשרת)
-    generateSummary: async function(patientRecord) {
-        const response = await fetch('/api/generate-summary', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(patientRecord)
-        });
-        
-        if (!response.ok) {
-            throw new Error('שגיאה ביצירת סיכום');
-        }
-        
-        const data = await response.json();
-        // נניח שהשרת מחזיר אובייקט בצורה { summary: "טקסט הסיכום" }
-        // נוסיף אותו לתוך הרשומה עצמה
-        patientRecord.summary = data.summary;
-        return patientRecord; 
-    },
-    
-    // פונקציה לשליחת הסיכום לרופא/ה (שלב 5)
-    sendSummaryToDoctor: async function(patientRecord, doctorEmail) {
-        // מדמה שליחת דוא"ל או שמירה במסד נתונים
-        return new Promise((resolve) => {
-            // מדמה זמן תגובה מהשרת
-            setTimeout(() => {
-                resolve({
-                    success: true,
-                    timestamp: new Date().toISOString(),
-                    message: `הסיכום נשלח בהצלחה לרופא/ה ${doctorEmail}`
-                });
-            }, 1000); // שנייה אחת לדמות זמן תגובה
-        });
-    }
 };
 
 // פונקציות עזר לממשק המשתמש
@@ -162,6 +20,11 @@ function showStep(stepNumber) {
     
     // מעדכן את המצב הנוכחי
     state.currentStep = stepNumber;
+    
+    // עדכון סרגל התקדמות אם קיים
+    if (window.FormComponents && window.FormComponents.createProgressBar) {
+        updateProgressBar();
+    }
 }
 
 // פונקציה ליצירת אלמנט שאלה במסך
@@ -203,11 +66,110 @@ function collectAnswers(selector) {
     return answers;
 }
 
+// פונקציה לזיהוי וסימון דגלים אדומים בסיכום
+function highlightRedFlags() {
+    const summaryElement = document.getElementById('summary-text');
+    if (!summaryElement) return;
+    
+    const summaryText = summaryElement.textContent;
+    
+    // בדיקה אם יש דגלים אדומים בסיכום
+    if (summaryText.includes('דגלים אדומים:')) {
+        // חלק את הטקסט לפסקאות
+        const paragraphs = summaryText.split('\n\n');
+        let updatedHtml = '';
+        
+        for (const paragraph of paragraphs) {
+            if (paragraph.includes('דגלים אדומים:')) {
+                // עטוף את הפסקה של הדגלים האדומים ב-div מיוחד
+                updatedHtml += `<div class="red-flag">
+                    <div class="red-flag-content">${paragraph}</div>
+                </div>`;
+            } else {
+                updatedHtml += paragraph + '\n\n';
+            }
+        }
+        
+        // עדכון התצוגה עם ההדגשות
+        summaryElement.innerHTML = updatedHtml;
+    }
+}
+
+// פונקציה לעדכון סרגל התקדמות
+function updateProgressBar() {
+    const progressContainer = document.getElementById('progress-bar-container');
+    if (!progressContainer) return;
+    
+    progressContainer.innerHTML = window.FormComponents.createProgressBar(state.currentStep, 5);
+}
+
 // אתחול הממשק
 document.addEventListener('DOMContentLoaded', function() {
-    // מילוי רשימת התלונות הנפוצות
+    // הוספת סרגל התקדמות
+    const mainContainer = document.querySelector('.container');
+    if (mainContainer) {
+        const progressBar = document.createElement('div');
+        progressBar.id = 'progress-bar-container';
+        progressBar.className = 'progress-bar-container';
+        mainContainer.insertBefore(progressBar, mainContainer.firstChild);
+        updateProgressBar();
+    }
+    
+    // מילוי רשימת התלונות הנפוצות - VERY IMPORTANT
     const complaintSelect = document.getElementById('main-complaint');
-    MedicalDataSystem.commonComplaints.forEach(complaint => {
+    if (!complaintSelect) {
+        console.error("לא נמצא אלמנט 'main-complaint' בדף!");
+        return;
+    }
+    
+    // רשימת תלונות נפוצות (בגרסה פשוטה בלי תלות בשרת)
+    const complaints = [
+        "כאב גרון",
+        "כאב ראש",
+        "כאב בטן",
+        "כאב גב",
+        "שיעול",
+        "קוצר נשימה",
+        "סחרחורת",
+        "בחילה",
+        "הקאות",
+        "פריחה בעור",
+        "חום",
+        "חולשה כללית",
+        "כאב אוזניים",
+        "כאב חזה",
+        "שבר", 
+        "נקע",
+        "פציעת ספורט",
+        "חתך", 
+        "שריטה",
+        "כוויה",
+        "תאונת דרכים",
+        "נפילה מגובה",
+        "פציעת ראש",
+        "דימום",
+        "חבלה",
+        "מכה",
+        "עקיצה",
+        "הכשת נחש",
+        "הכשת עקרב",
+        "הרעלה",
+        "התייבשות",
+        "היפותרמיה",
+        "היפרתרמיה",
+        "טביעה",
+        "התקף חרדה",
+        "התקף אפילפסיה",
+        "פגיעה בעין",
+        "גוף זר בעין",
+        "פגיעה בשן",
+        "דלקת עיניים",
+        "דלקת אוזניים",
+        "אחר"
+    ];
+    
+    // מילוי התלונות
+    complaints.forEach(complaint => {
         const option = document.createElement('option');
         option.value = complaint;
         option.textContent = complaint;
@@ -244,6 +206,11 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
         
+        if (!gender) {
+            alert('יש לבחור מין');
+            return;
+        }
+        
         if (!mainComplaint) {
             alert('יש לבחור תלונה עיקרית');
             return;
@@ -260,14 +227,21 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         
         // יצירת רשומת מטופל חדשה
-        state.patientRecord = MedicalDataSystem.createPatientRecord(
-            parseInt(age),
-            gender,
-            mainComplaint
-        );
+        state.patientRecord = {
+            patientInfo: {
+                age: parseInt(age),
+                gender: gender,
+                mainComplaint: mainComplaint,
+                timestamp: new Date().toISOString()
+            },
+            standardAnswers: {},
+            dynamicAnswers: {},
+            summary: ""
+        };
         
         // קבלת שאלות סטנדרטיות לפי התלונה
-        const standardQuestions = MedicalDataSystem.getStandardQuestions(mainComplaint);
+        // במקום לשלוח בקשה לשרת, נשתמש בשאלות מוגדרות מראש
+        let standardQuestions = getStandardQuestions(mainComplaint);
         
         // יצירת אלמנטי שאלות במסך
         const questionsList = document.getElementById('standard-questions-list');
@@ -297,15 +271,12 @@ document.addEventListener('DOMContentLoaded', function() {
     });
     
     // שלב 2 -> שלב 3
-    document.getElementById('next-to-step3').addEventListener('click', async function() {
+    document.getElementById('next-to-step3').addEventListener('click', function() {
         // איסוף תשובות לשאלות סטנדרטיות
         const standardAnswers = collectAnswers('input[data-standard="true"]');
         
         // שמירת התשובות ברשומת המטופל
-        state.patientRecord = MedicalDataSystem.saveStandardAnswers(
-            state.patientRecord, 
-            standardAnswers
-        );
+        state.patientRecord.standardAnswers = standardAnswers;
         
         // הצגת אנימציית טעינה
         document.getElementById('dynamic-questions-loading').style.display = 'block';
@@ -314,9 +285,9 @@ document.addEventListener('DOMContentLoaded', function() {
         // מעבר לשלב הבא
         showStep(3);
         
-        try {
-            // קבלת שאלות דינמיות מה-LLM (שרת)
-            const dynamicQuestions = await MedicalDataSystem.getDynamicQuestions(state.patientRecord);
+        // סימולציית קבלת שאלות דינמיות (במקום בקשה אמיתית לשרת)
+        setTimeout(() => {
+            const dynamicQuestions = getDynamicQuestions(state.patientRecord.patientInfo.mainComplaint);
             
             // יצירת אלמנטי שאלות במסך
             const questionsList = document.getElementById('dynamic-questions-list');
@@ -330,11 +301,7 @@ document.addEventListener('DOMContentLoaded', function() {
             // הסתרת אנימציית הטעינה והצגת השאלות
             document.getElementById('dynamic-questions-loading').style.display = 'none';
             document.getElementById('dynamic-questions-container').style.display = 'block';
-        } catch (error) {
-            console.error('שגיאה בקבלת שאלות דינמיות:', error);
-            alert('אירעה שגיאה בקבלת שאלות נוספות. נא לנסות שוב.');
-            showStep(2);
-        }
+        }, 1500); // סימולציית המתנה של 1.5 שניות
     });
     
     // שלב 3 -> שלב 2
@@ -343,15 +310,12 @@ document.addEventListener('DOMContentLoaded', function() {
     });
     
     // שלב 3 -> שלב 4
-    document.getElementById('next-to-step4').addEventListener('click', async function() {
+    document.getElementById('next-to-step4').addEventListener('click', function() {
         // איסוף תשובות לשאלות דינמיות
         const dynamicAnswers = collectAnswers('input[data-dynamic="true"]');
         
         // שמירת התשובות ברשומת המטופל
-        state.patientRecord = MedicalDataSystem.saveDynamicAnswers(
-            state.patientRecord, 
-            dynamicAnswers
-        );
+        state.patientRecord.dynamicAnswers = dynamicAnswers;
         
         // הצגת אנימציית טעינה
         document.getElementById('summary-loading').style.display = 'block';
@@ -360,21 +324,22 @@ document.addEventListener('DOMContentLoaded', function() {
         // מעבר לשלב הבא
         showStep(4);
         
-        try {
-            // יצירת סיכום אנמנזה (מהשרת)
-            state.patientRecord = await MedicalDataSystem.generateSummary(state.patientRecord);
+        // סימולציית יצירת סיכום אנמנזה (במקום בקשה אמיתית לשרת)
+        // סימולציית יצירת סיכום אנמנזה (במקום בקשה אמיתית לשרת)
+        setTimeout(() => {
+            const summary = generateSummary(state.patientRecord);
+            state.patientRecord.summary = summary;
             
             // הצגת הסיכום במסך
-            document.getElementById('summary-text').textContent = state.patientRecord.summary;
+            document.getElementById('summary-text').textContent = summary;
+            
+            // הדגשת דגלים אדומים
+            highlightRedFlags();
             
             // הסתרת אנימציית הטעינה והצגת הסיכום
             document.getElementById('summary-loading').style.display = 'none';
             document.getElementById('summary-container').style.display = 'block';
-        } catch (error) {
-            console.error('שגיאה ביצירת סיכום:', error);
-            alert('אירעה שגיאה ביצירת הסיכום. נא לנסות שוב.');
-            showStep(3);
-        }
+        }, 2000); // סימולציית המתנה של 2 שניות
     });
     
     // שלב 4 -> שלב 3
@@ -382,36 +347,87 @@ document.addEventListener('DOMContentLoaded', function() {
         showStep(3);
     });
     
-    // שלב 4 -> שלב 5
-    document.getElementById('send-summary').addEventListener('click', async function() {
-        // בדיקת תקינות כתובת דוא"ל
+    // כפתור העתקת הסיכום
+    document.getElementById('copy-summary').addEventListener('click', function() {
+        const summaryText = document.getElementById('summary-text').textContent;
+        
+        // העתקה ללוח
+        navigator.clipboard.writeText(summaryText)
+            .then(() => {
+                // אנימציה להצלחת ההעתקה
+                this.classList.add('copy-success');
+                
+                // הודעת הצלחה
+                const originalText = this.innerHTML;
+                this.innerHTML = '<i class="fas fa-check"></i> הועתק בהצלחה';
+                
+                // החזרת הטקסט המקורי אחרי 2 שניות
+                setTimeout(() => {
+                    this.innerHTML = originalText;
+                    this.classList.remove('copy-success');
+                }, 2000);
+            })
+            .catch(err => {
+                console.error('שגיאה בהעתקה:', err);
+                alert('שגיאה בהעתקה. נסה שוב.');
+            });
+    });
+    
+    // כפתור סיום בלי צורך בדוא"ל
+    document.getElementById('complete-summary').addEventListener('click', function() {
+        // העבר ישירות לשלב 5 (סיום)
+        document.getElementById('final-summary-text').textContent = state.patientRecord.summary;
+        
+        // הוסף יכולת העתקה גם בשלב הסיום
+        highlightRedFlagsInFinalSummary();
+        
+        showStep(5);
+    });
+    
+    // שלב 4 -> שלב 5 (עם שליחה לרופא אופציונלית)
+    document.getElementById('send-summary').addEventListener('click', function() {
+        // בדיקה אם הוזן דוא"ל
         const doctorEmail = document.getElementById('doctor-email').value.trim();
         
-        if (!doctorEmail) {
-            alert('יש להזין כתובת דוא"ל של הרופא/ה');
-            return;
-        }
+        // העברה לשלב 5 עם הסיכום
+        document.getElementById('final-summary-text').textContent = state.patientRecord.summary;
         
-        // אימות פשוט של פורמט דוא"ל
-        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        if (!emailRegex.test(doctorEmail)) {
-            alert('יש להזין כתובת דוא"ל תקינה');
-            return;
-        }
+        // הוסף יכולת העתקה גם בשלב הסיום
+        highlightRedFlagsInFinalSummary();
         
-        try {
-            // שליחת הסיכום לרופא/ה
-            await MedicalDataSystem.sendSummaryToDoctor(state.patientRecord, doctorEmail);
-            
-            // הצגת הסיכום הסופי
-            document.getElementById('final-summary-text').textContent = state.patientRecord.summary;
-            
-            // מעבר לשלב האחרון
-            showStep(5);
-        } catch (error) {
-            console.error('שגיאה בשליחת הסיכום:', error);
-            alert('אירעה שגיאה בשליחת הסיכום. נא לנסות שוב.');
+        // התקדם לשלב הסיום
+        showStep(5);
+        
+        // סימולציית שליחה אם הוזן דוא"ל
+        if (doctorEmail) {
+            alert(`הסיכום נשלח בהצלחה לכתובת: ${doctorEmail}`);
         }
+    });
+    
+    // כפתור העתקת הסיכום הסופי
+    document.getElementById('copy-final-summary').addEventListener('click', function() {
+        const summaryText = document.getElementById('final-summary-text').textContent;
+        
+        // העתקה ללוח
+        navigator.clipboard.writeText(summaryText)
+            .then(() => {
+                // אנימציה להצלחת ההעתקה
+                this.classList.add('copy-success');
+                
+                // הודעת הצלחה
+                const originalText = this.innerHTML;
+                this.innerHTML = '<i class="fas fa-check"></i> הועתק בהצלחה';
+                
+                // החזרת הטקסט המקורי אחרי 2 שניות
+                setTimeout(() => {
+                    this.innerHTML = originalText;
+                    this.classList.remove('copy-success');
+                }, 2000);
+            })
+            .catch(err => {
+                console.error('שגיאה בהעתקה:', err);
+                alert('שגיאה בהעתקה. נסה שוב.');
+            });
     });
     
     // התחלת רשומה חדשה
@@ -432,132 +448,296 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 });
 
-/**
- * פונקציות שיפור חווית משתמש
- */
-
-// מעבר בין מצב רגיל למצב לילה
-function toggleDarkMode() {
-    const isDarkMode = document.body.getAttribute('data-theme') === 'dark';
-    document.body.setAttribute('data-theme', isDarkMode ? 'light' : 'dark');
-    localStorage.setItem('theme', isDarkMode ? 'light' : 'dark');
+// פונקציה להדגשת דגלים אדומים בסיכום הסופי
+function highlightRedFlagsInFinalSummary() {
+    const summaryElement = document.getElementById('final-summary-text');
+    if (!summaryElement) return;
     
-    // עדכון הכפתור
-    const darkModeButton = document.getElementById('dark-mode-toggle');
-    if (darkModeButton) {
-      darkModeButton.innerHTML = isDarkMode ? 
-        '<i class="fas fa-moon"></i> מצב לילה' : 
-        '<i class="fas fa-sun"></i> מצב יום';
+    const summaryText = summaryElement.textContent;
+    
+    // בדיקה אם יש דגלים אדומים בסיכום
+    if (summaryText.includes('דגלים אדומים:')) {
+        // חלק את הטקסט לפסקאות
+        const paragraphs = summaryText.split('\n\n');
+        let updatedHtml = '';
+        
+        for (const paragraph of paragraphs) {
+            if (paragraph.includes('דגלים אדומים:')) {
+                // עטוף את הפסקה של הדגלים האדומים ב-div מיוחד
+                updatedHtml += `<div class="red-flag">
+                    <div class="red-flag-content">${paragraph}</div>
+                </div>`;
+            } else {
+                updatedHtml += paragraph + '\n\n';
+            }
+        }
+        
+        // עדכון התצוגה עם ההדגשות
+        summaryElement.innerHTML = updatedHtml;
     }
-  }
-  
-  // עדכון תצוגה מקדימה של האנמנזה בזמן אמת
-  function updateLivePreview() {
-    if (!state.patientRecord) return;
-    
-    const livePreviewContainer = document.getElementById('live-preview-container');
-    if (!livePreviewContainer) return;
-    
-    const additionalInfo = {
-      profile: document.getElementById('profile-number')?.value || '97',
-      section: document.getElementById('profile-section')?.value || 'משקפיים',
-      allergies: document.getElementById('allergies')?.value || 'ללא אלרגיות ידועות',
-      medications: document.getElementById('medications')?.value || 'לא נוטל תרופות באופן קבוע'
+}
+
+// פונקציית עזר להשגת שאלות סטנדרטיות לפי תלונה
+function getStandardQuestions(complaint) {
+    const standardQuestions = {
+        "כאב גרון": [
+            "כמה זמן נמשך הכאב?",
+            "האם יש חום?",
+            "האם יש קושי בבליעה?",
+            "האם יש צרידות?",
+            "האם נוטל/ת תרופות כלשהן?"
+        ],
+        "כאב ראש": [
+            "כמה זמן נמשך הכאב?",
+            "היכן ממוקם הכאב?",
+            "האם יש חום?",
+            "האם יש בחילה או הקאות?",
+            "האם הכאב מפריע לשינה?"
+        ],
+        "כאב בטן": [
+            "כמה זמן נמשך הכאב?",
+            "היכן ממוקם הכאב?",
+            "האם יש שינויים ביציאות?",
+            "האם יש הקאות?",
+            "האם יש חום?"
+        ],
+        "כאב גב": [
+            "כמה זמן נמשך הכאב?",
+            "היכן ממוקם הכאב בדיוק?",
+            "האם הכאב מקרין לרגליים?",
+            "האם יש חולשה או נימול ברגליים?",
+            "האם הכאב משתנה עם תנועה או מנוחה?"
+        ],
+        "שיעול": [
+            "כמה זמן נמשך השיעול?",
+            "האם השיעול יבש או עם ליחה?",
+            "מה צבע הליחה אם יש?",
+            "האם יש קוצר נשימה?",
+            "האם היית במגע עם אנשים חולים?"
+        ],
+        "קוצר נשימה": [
+            "מתי התחיל קוצר הנשימה?",
+            "האם זה קורה במנוחה או במאמץ?",
+            "האם יש כאב בחזה?",
+            "האם יש שיעול או ליחה?",
+            "האם אתה סובל ממחלת ריאות או לב?"
+        ],
+        "שבר": [
+            "היכן ממוקם הכאב?",
+            "האם מרגיש/ה עיוות או עקמומיות באזור?",
+            "האם יש נפיחות באזור?",
+            "האם יש שינוי צבע (שטף דם)?",
+            "האם יש הגבלה בתנועה?",
+            "מתי ואיך אירעה הפציעה?"
+        ],
+        "פציעת ראש": [
+            "האם היה אובדן הכרה?",
+            "האם יש בחילה או הקאות?",
+            "האם יש סחרחורת?",
+            "האם יש אי-שקט או בלבול?",
+            "האם זרם דם או נוזל שקוף מהאף או האוזניים?",
+            "האם יש כאב ראש חזק?",
+            "האם יש טשטוש ראייה?"
+        ],
+        "כוויה": [
+            "היכן נמצאת הכוויה?",
+            "מה גודל הכוויה (אחוז משטח הגוף)?",
+            "כיצד נגרמה הכוויה (חום, כימיקלים, חשמל)?",
+            "האם יש שלפוחיות?",
+            "האם האזור אדום, לבן או שחור?",
+            "האם ננקטו פעולות עזרה ראשונה?"
+        ]
     };
     
-    livePreviewContainer.innerHTML = FormComponents.createLivePreview(state.patientRecord, additionalInfo);
-  }
-  
-  // עדכון סרגל התקדמות
-  function updateProgressBar() {
-    const progressContainer = document.getElementById('progress-bar-container');
-    if (!progressContainer) return;
-    
-    progressContainer.innerHTML = FormComponents.createProgressBar(state.currentStep, 4);
-  }
-  
-  // הוספת מאזיני אירועים לתמיכה בתצוגה מקדימה בזמן אמת
-  function setupLivePreviewListeners() {
-    // מאזיני אירועים לשדות פרופיל
-    const profileFields = ['profile-number', 'profile-section', 'allergies', 'medications'];
-    profileFields.forEach(id => {
-      const element = document.getElementById(id);
-      if (element) {
-        element.addEventListener('input', updateLivePreview);
-      }
-    });
-    
-    // מאזיני אירועים לשאלות סטנדרטיות ודינמיות
-    document.addEventListener('input', function(event) {
-      if (event.target.matches('input[data-standard="true"]') || 
-          event.target.matches('input[data-dynamic="true"]')) {
-        // עדכון מידי של המידע ברשומת המטופל
-        if (state.patientRecord) {
-          if (event.target.dataset.standard === 'true') {
-            state.patientRecord.standardAnswers[event.target.dataset.question] = event.target.value;
-          } else if (event.target.dataset.dynamic === 'true') {
-            state.patientRecord.dynamicAnswers[event.target.dataset.question] = event.target.value;
-          }
-          
-          // עדכון התצוגה המקדימה
-          updateLivePreview();
-        }
-      }
-    });
-  }
-  
-  // הוספת קוד אתחול לאחר טעינת ה-DOM
-  document.addEventListener('DOMContentLoaded', function() {
-    // הערה: אל תשכח לשלב את הקוד הזה עם האירועים הקיימים
-    // אם יש כבר מאזין DOMContentLoaded, הוסף את הקוד הבא בתוכו
-    
-    // הוספת סרגל התקדמות
-    const mainContainer = document.querySelector('.container');
-    if (mainContainer) {
-      const progressBar = document.createElement('div');
-      progressBar.id = 'progress-bar-container';
-      progressBar.className = 'progress-bar-container';
-      mainContainer.insertBefore(progressBar, mainContainer.firstChild);
-      updateProgressBar();
+    // אם יש שאלות מוגדרות לתלונה, החזר אותן
+    if (standardQuestions[complaint]) {
+        return standardQuestions[complaint];
     }
     
-    // הוספת כפתור מצב לילה
-    const headerElement = document.querySelector('header');
-    if (headerElement) {
-      const darkModeButton = document.createElement('button');
-      darkModeButton.id = 'dark-mode-toggle';
-      darkModeButton.className = 'dark-mode-toggle';
-      darkModeButton.innerHTML = '<i class="fas fa-moon"></i> מצב לילה';
-      darkModeButton.onclick = toggleDarkMode;
-      headerElement.appendChild(darkModeButton);
-      
-      // הגדרת מצב ראשוני לפי העדפת המשתמש
-      const savedTheme = localStorage.getItem('theme');
-      if (savedTheme) {
-        document.body.setAttribute('data-theme', savedTheme);
-        if (savedTheme === 'dark') {
-          darkModeButton.innerHTML = '<i class="fas fa-sun"></i> מצב יום';
-        }
-      }
-    }
-    
-    // הוספת תצוגה מקדימה לשלב האנמנזה
-    const summaryContainer = document.getElementById('summary-container');
-    if (summaryContainer) {
-      const livePreview = document.createElement('div');
-      livePreview.id = 'live-preview-container';
-      summaryContainer.appendChild(livePreview);
-    }
-    
-    // הגדרת מאזיני אירועים לתצוגה מקדימה
-    setupLivePreviewListeners();
-    
-    // עדכון פונקציות המעבר בין שלבים כדי לעדכן את סרגל ההתקדמות
-    const originalShowStep = window.showStep || function() {};
-    window.showStep = function(stepNumber) {
-      originalShowStep(stepNumber);
-      state.currentStep = stepNumber;
-      updateProgressBar();
-    };
-  });
+    // אחרת החזר שאלות כלליות
+    return [
+        "מתי התחילו הסימפטומים?",
+        "האם הסימפטומים מחמירים או משתפרים?",
+        "האם יש גורמים שמחמירים את המצב?",
+        "האם ניסית טיפול כלשהו עד כה?",
+        "האם יש רקע רפואי שיכול להיות קשור למצב הנוכחי?"
+    ];
+}
 
+// פונקציית עזר לקבלת שאלות דינמיות (מדמה תשובה מהשרת)
+function getDynamicQuestions(complaint) {
+    const dynamicQuestionsMap = {
+        "כאב ראש": [
+            "האם יש גורמים מחמירים כמו אור או רעש?",
+            "האם יש הפרעות ראייה?",
+            "האם הכאב ממוקד בצד אחד או בשני הצדדים?",
+            "האם היו לך כאבי ראש דומים בעבר?",
+            "האם הכאב הופיע בפתאומיות או בהדרגה?"
+        ],
+        "כאב בטן": [
+            "האם הכאב מקרין לאזורים אחרים?",
+            "האם יש תיאבון?",
+            "האם הכאב משתנה אחרי אכילה?",
+            "האם יש גזים או נפיחות?",
+            "האם היו אירועים דומים בעבר?"
+        ],
+        "כאב גרון": [
+            "האם יש נקודות לבנות בגרון?",
+            "האם יש נפיחות בבלוטות הלימפה בצוואר?",
+            "האם הכאב מחמיר בבליעה?",
+            "האם היית במגע עם אנשים חולים?",
+            "האם יש כאבים באוזניים?"
+        ],
+        "פציעת ראש": [
+            "האם איבדת הכרה אחרי הפגיעה?",
+            "האם יש בלבול או טשטוש?",
+            "האם אתה זוכר את האירוע שגרם לפציעה?",
+            "האם יש רגישות לאור או רעש?",
+            "האם ישנת מאז הפציעה ואם כן, היה קושי להעיר אותך?"
+        ],
+        "שבר": [
+            "האם יש דפורמציה באזור הפגוע?",
+            "האם יש כאב בתנועה פסיבית (כשמזיזים לך)?",
+            "האם ניתן לשאת משקל על האזור הפגוע?",
+            "האם היו פגיעות דומות באותו מקום בעבר?",
+            "האם יש תחושת נימול או חוסר תחושה מתחת לאזור הפגיעה?"
+        ]
+    };
+    
+    // אם יש שאלות ספציפיות לתלונה
+    if (dynamicQuestionsMap[complaint]) {
+        return dynamicQuestionsMap[complaint];
+    }
+    
+    // שאלות כלליות
+    return [
+        "האם יש סימפטומים נוספים שלא הזכרת?",
+        "האם המצב משפיע על התפקוד היומיומי?",
+        "האם ניסית טיפול כלשהו בבית?",
+        "האם יש רקע רפואי שעשוי להיות רלוונטי?",
+        "האם אתה נוטל תרופות באופן קבוע?"
+    ];
+}
+
+// פונקציית עזר ליצירת סיכום אנמנזה (מדמה תשובה מהשרת)
+function generateSummary(patientRecord) {
+    const { age, gender, mainComplaint } = patientRecord.patientInfo;
+    const genderText = gender === 'male' ? 'זכר' : 'נקבה';
+    
+    // איסוף מידע משמעותי מהתשובות
+    let duration = "לא ידוע";
+    let painLocation = "";
+    let severityFactors = [];
+    let otherSymptoms = [];
+    let treatments = [];
+    
+    // חיפוש תשובות רלוונטיות
+    for (const [question, answer] of Object.entries(patientRecord.standardAnswers)) {
+        if (!answer) continue;
+        
+        if (question.includes("זמן") || question.includes("מתי")) {
+            duration = answer;
+        } else if (question.includes("היכן") || question.includes("מיקום") || question.includes("איפה")) {
+            painLocation = answer;
+        } else if (question.includes("מחמיר") || question.includes("מקל")) {
+            severityFactors.push(answer);
+        } else if (question.includes("סימפטומים") || question.includes("תסמינים")) {
+            otherSymptoms.push(answer);
+        } else if (question.includes("טיפול") || question.includes("תרופות")) {
+            treatments.push(answer);
+        }
+    }
+    
+    for (const [question, answer] of Object.entries(patientRecord.dynamicAnswers)) {
+        if (!answer) continue;
+        
+        if (question.includes("זמן") || question.includes("מתי")) {
+            duration = answer;
+        } else if (question.includes("היכן") || question.includes("מיקום") || question.includes("איפה")) {
+            painLocation = answer;
+        } else if (question.includes("מחמיר") || question.includes("מקל")) {
+            severityFactors.push(answer);
+        } else if (question.includes("סימפטומים") || question.includes("תסמינים")) {
+            otherSymptoms.push(answer);
+        } else if (question.includes("טיפול") || question.includes("תרופות")) {
+            treatments.push(answer);
+        }
+    }
+    
+    // בדיקה לדגלים אדומים
+    const redFlags = checkForRedFlags(patientRecord);
+    
+    // יצירת הסיכום
+    let summary = `מטופל/ת בגיל ${age}, ${genderText}, עם תלונה עיקרית של ${mainComplaint}.\n\n`;
+    
+    summary += `התלונה החלה ${duration || "לפני זמן לא ידוע"}`;
+    if (painLocation) {
+        summary += ` ומתמקדת ב${painLocation}`;
+    }
+    if (severityFactors.length > 0) {
+        summary += `. הגורמים המשפיעים על עוצמת התלונה כוללים: ${severityFactors.join(", ")}`;
+    }
+    summary += ".\n\n";
+    
+    if (otherSymptoms.length > 0 || treatments.length > 0) {
+        summary += "מידע נוסף: ";
+        if (otherSymptoms.length > 0) {
+            summary += `סימפטומים נלווים - ${otherSymptoms.join(", ")}. `;
+        }
+        if (treatments.length > 0) {
+            summary += `טיפולים שננקטו - ${treatments.join(", ")}. `;
+        }
+        summary += "\n\n";
+    }
+    
+    if (redFlags.length > 0) {
+        summary += `דגלים אדומים: ${redFlags.join("; ")}.`;
+    }
+    
+    return summary;
+}
+
+// פונקציית עזר לבדיקת דגלים אדומים
+function checkForRedFlags(patientRecord) {
+    const redFlags = [];
+    const { mainComplaint } = patientRecord.patientInfo;
+    
+    // פונקציית עזר לבדיקה אם מילת מפתח מופיעה בשאלות ותשובות
+    const hasKeyword = (keyword) => {
+        for (const [question, answer] of Object.entries({
+            ...patientRecord.standardAnswers,
+            ...patientRecord.dynamicAnswers
+        })) {
+            if ((question.toLowerCase().includes(keyword.toLowerCase()) ||
+                 answer.toLowerCase().includes(keyword.toLowerCase())) && 
+                answer.toLowerCase().includes("כן")) {
+                return true;
+            }
+        }
+        return false;
+    };
+    
+    // דגלים אדומים לפי תלונה עיקרית
+    if (mainComplaint.includes("כאב ראש")) {
+        if (hasKeyword("הקאות")) redFlags.push("הקאות בשילוב עם כאב ראש");
+        if (hasKeyword("פתאומי")) redFlags.push("כאב ראש שהופיע בפתאומיות");
+        if (hasKeyword("הכרה")) redFlags.push("איבוד הכרה בשילוב עם כאב ראש");
+    } 
+    else if (mainComplaint.includes("כאב חזה")) {
+        if (hasKeyword("קוצר נשימה")) redFlags.push("כאב חזה בשילוב עם קוצר נשימה");
+        if (hasKeyword("זיעה")) redFlags.push("כאב חזה בשילוב עם הזעה");
+        if (hasKeyword("לחץ")) redFlags.push("תחושת לחץ בחזה");
+    }
+    else if (mainComplaint.includes("פציעת ראש")) {
+        if (hasKeyword("הכרה")) redFlags.push("איבוד הכרה לאחר פציעת ראש");
+        if (hasKeyword("הקאות")) redFlags.push("הקאות לאחר פציעת ראש");
+        if (hasKeyword("שקוף") || hasKeyword("נוזל") || hasKeyword("אוזניים")) 
+            redFlags.push("נוזל שקוף מהאף או האוזניים");
+    }
+    
+    // דגלים אדומים כלליים
+    if (hasKeyword("נשימה")) redFlags.push("קשיי נשימה");
+    if (hasKeyword("דם") && hasKeyword("הקאות")) redFlags.push("הקאות דמיות");
+    
+    return redFlags;
+}
