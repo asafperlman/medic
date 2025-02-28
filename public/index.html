@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>מערכת איסוף נתונים רפואיים</title>
+    <link rel="stylesheet" href="styles.css">
+    <!-- להוסיף ב-head לפני תגית הסגירה </head> -->
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="styles-dark.css">
+    <!-- Font Awesome לאייקונים -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+    <!-- קישור לקבצי JavaScript המשופרים -->
+    <script src="components/formComponents.js" defer></script>
+    <script src="utils/offlineManager.js" defer></script>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>מערכת איסוף נתונים רפואיים</h1>
+            <p>מערכת לאיסוף מידע רפואי מהמטופל והעברתו לרופא/ה</p>
+        </header>
+
+        <!-- שלב 1: הזנת מידע בסיסי -->
+        <div id="step1" class="step active">
+            <h2>שלב 1: מידע בסיסי על המטופל</h2>
+            <div class="form-group">
+                <label for="patient-age">גיל:</label>
+                <input type="number" id="patient-age" min="0" max="120" required>
+            </div>
+            <div class="form-group">
+                <label>מין:</label>
+                <div class="radio-group">
+                    <label class="radio-option">
+                        <input type="radio" name="gender" value="male" checked> זכר
+                    </label>
+                    <label class="radio-option">
+                        <input type="radio" name="gender" value="female"> נקבה
+                    </label>
+                </div>
+            </div>
+            <div class="form-group">
+                <label for="main-complaint">תלונה עיקרית:</label>
+                <select id="main-complaint" required>
+                    <option value="" disabled selected>בחר תלונה עיקרית</option>
+                    <!-- אפשרויות יתווספו דינמית ע"י JavaScript -->
+                </select>
+            </div>
+            <div class="form-group" id="other-complaint-container" style="display: none;">
+                <label for="other-complaint">פרט תלונה אחרת:</label>
+                <input type="text" id="other-complaint">
+            </div>
+            <div class="button-group">
+                <div></div> <!-- שומר מקום לכפתור "הקודם" שיופיע בשלבים הבאים -->
+                <button id="next-to-step2">המשך לשאלות</button>
+            </div>
+        </div>
+
+        <!-- שלב 2: שאלות סטנדרטיות -->
+        <div id="step2" class="step">
+            <h2>שלב 2: שאלות סטנדרטיות</h2>
+            <div id="standard-questions-container">
+                <ul class="questions-list" id="standard-questions-list">
+                    <!-- שאלות יתווספו דינמית ע"י JavaScript -->
+                </ul>
+            </div>
+            <div class="button-group">
+                <button id="back-to-step1" class="secondary">חזור</button>
+                <button id="next-to-step3">המשך לשאלות נוספות</button>
+            </div>
+        </div>
+
+        <!-- שלב 3: שאלות דינמיות -->
+        <div id="step3" class="step">
+            <h2>שלב 3: שאלות נוספות</h2>
+            <div class="loading" id="dynamic-questions-loading">
+                <div class="loading-spinner"></div>
+                <p>מייצר שאלות נוספות...</p>
+            </div>
+            <div id="dynamic-questions-container">
+                <ul class="questions-list" id="dynamic-questions-list">
+                    <!-- שאלות יתווספו דינמית ע"י JavaScript -->
+                </ul>
+            </div>
+            <div class="button-group">
+                <button id="back-to-step2" class="secondary">חזור</button>
+                <button id="next-to-step4">יצירת סיכום</button>
+            </div>
+        </div>
+
+        <!-- שלב 4: סיכום ושליחה -->
+        <div id="step4" class="step">
+            <h2>שלב 4: סיכום המידע</h2>
+            <div class="loading" id="summary-loading">
+                <div class="loading-spinner"></div>
+                <p>מייצר סיכום אנמנזה...</p>
+            </div>
+            <div id="summary-container">
+                <div class="summary-box">
+                    <h3>סיכום אנמנזה</h3>
+                    <p id="summary-text"></p>
+                </div>
+                <div class="form-group">
+                    <label for="doctor-email">כתובת דוא"ל של הרופא/ה:</label>
+                    <input type="email" id="doctor-email" required>
+                </div>
+            </div>
+            <div class="button-group">
+                <button id="back-to-step3" class="secondary">חזור</button>
+                <button id="send-summary">שלח לרופא/ה</button>
+            </div>
+        </div>
+
+        <!-- שלב 5: אישור שליחה -->
+        <div id="step5" class="step">
+            <h2>הסיכום נשלח בהצלחה</h2>
+            <p>הסיכום נשלח בהצלחה לרופא/ה.</p>
+            <div class="summary-box">
+                <h3>סיכום ששלחנו:</h3>
+                <p id="final-summary-text"></p>
+            </div>
+            <div class="button-group">
+                <div></div> <!-- שומר מקום -->
+                <button id="start-new" class="secondary">התחל רשומה חדשה</button>
+            </div>
+        </div>
+    </div>
+
+    
+</body>
+</html>
