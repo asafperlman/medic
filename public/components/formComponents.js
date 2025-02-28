@@ -88,9 +88,14 @@ function createAccordion(id, title, content, isOpen = false) {
    * @param {object} additionalInfo - מידע נוסף (פרופיל, סעיף, וכו')
    * @returns {string} - HTML של תצוגת האנמנזה
    */
-  function createLivePreview(patientData, additionalInfo) {
+  function createLivePreview(patientData) {
     // יצירת שורת פרופיל
-    const profileLine = `פרופיל ${additionalInfo.profile || '97'}, סעיף ${additionalInfo.section || 'משקפיים'}. ${additionalInfo.allergies || 'ללא אלרגיות ידועות'}, ${additionalInfo.medications || 'לא נוטל תרופות באופן קבוע'}`;
+    const profile = patientData.patientInfo.profile || '97';
+    const sections = patientData.patientInfo.medicalSections || 'ללא סעיפים';
+    const allergies = patientData.patientInfo.allergies || 'ללא אלרגיות ידועות';
+    const medications = patientData.patientInfo.medications || 'לא נוטל תרופות באופן קבוע';
+    
+    const profileLine = `פרופיל ${profile}, ${sections}. ${allergies}, ${medications}`;
     
     // יצירת טקסט האנמנזה הבסיסי
     let summaryText = '';
@@ -138,11 +143,69 @@ function createAccordion(id, title, content, isOpen = false) {
     `;
   }
   
+  /**
+   * יוצר תצוגת פרופיל רפואי
+   * @param {object} profileData - נתוני הפרופיל הרפואי
+   * @returns {string} - HTML של תצוגת הפרופיל
+   */
+  function createMedicalProfile(profileData) {
+    const { profile, sections, allergies, medications } = profileData;
+    
+    return `
+      <div class="medical-profile-card">
+        <div class="profile-header">
+          <h3>פרופיל רפואי</h3>
+        </div>
+        <div class="profile-details">
+          <div class="profile-item">
+            <span class="profile-label">פרופיל:</span>
+            <span class="profile-value">${profile}</span>
+          </div>
+          <div class="profile-item">
+            <span class="profile-label">סעיפים:</span>
+            <span class="profile-value">${sections || 'ללא סעיפים'}</span>
+          </div>
+          <div class="profile-item">
+            <span class="profile-label">אלרגיות:</span>
+            <span class="profile-value">${allergies}</span>
+          </div>
+          <div class="profile-item">
+            <span class="profile-label">תרופות קבועות:</span>
+            <span class="profile-value">${medications}</span>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+  
+  /**
+   * פורמט האנמנזה עם הדגשת דגלים אדומים
+   * @param {string} summaryText - טקסט האנמנזה המקורי
+   * @returns {string} - HTML של האנמנזה המעוצבת
+   */
+  function formatAnamnesis(summaryText) {
+    // חלוקה לפסקאות
+    const paragraphs = summaryText.split('\n\n');
+    let formattedHtml = '';
+    
+    paragraphs.forEach(paragraph => {
+      if (paragraph.includes('דגלים אדומים:')) {
+        formattedHtml += `<div class="red-flag-section">${paragraph}</div>`;
+      } else {
+        formattedHtml += `<p>${paragraph}</p>`;
+      }
+    });
+    
+    return formattedHtml;
+  }
+  
   // ייצוא הפונקציות לשימוש בקובץ הראשי
   window.FormComponents = {
     createAccordion,
     toggleAccordion,
     createProgressBar,
     createRedFlag,
-    createLivePreview
+    createLivePreview,
+    createMedicalProfile,
+    formatAnamnesis
   };

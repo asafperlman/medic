@@ -1,4 +1,4 @@
-/* public/styles.css */
+/* public/styles.css - מעודכן עם תמיכה בפרופיל רפואי */
 
 :root {
     --primary-color: #0056b3;
@@ -153,7 +153,7 @@ h2 {
 /* סימון דגלים אדומים */
 .red-flag {
     background-color: rgba(220, 53, 69, 0.1);
-    border-left: 4px solid var(--danger-color);
+    border-right: 4px solid var(--danger-color);
     padding: 15px;
     margin: 15px 0;
     border-radius: var(--border-radius);
@@ -164,13 +164,23 @@ h2 {
 .red-flag-icon {
     color: var(--danger-color);
     font-size: 24px;
-    margin-right: 10px;
+    margin-left: 10px;
 }
 
 .red-flag-content {
     flex-grow: 1;
     color: var(--danger-color);
     font-weight: bold;
+}
+
+.red-flag-section {
+    background-color: rgba(220, 53, 69, 0.1);
+    border-right: 4px solid var(--danger-color);
+    padding: 15px;
+    margin: 15px 0;
+    border-radius: var(--border-radius);
+    font-weight: bold;
+    color: var(--danger-color);
 }
 
 /* אנמנזה בזמן אמת */
@@ -188,6 +198,53 @@ h2 {
     margin-bottom: 10px;
 }
 
+/* פרופיל רפואי */
+.medical-profile-card {
+    background-color: #f0f7ff;
+    border-radius: var(--border-radius);
+    border: 1px solid #d0e3ff;
+    margin-bottom: 20px;
+    overflow: hidden;
+}
+
+.profile-header {
+    background-color: var(--primary-color);
+    color: white;
+    padding: 12px 15px;
+}
+
+.profile-header h3 {
+    margin: 0;
+    color: white;
+    font-size: 18px;
+}
+
+.profile-details {
+    padding: 15px;
+}
+
+.profile-item {
+    margin-bottom: 10px;
+    display: flex;
+}
+
+.profile-label {
+    min-width: 120px;
+    font-weight: bold;
+    color: var(--secondary-color);
+}
+
+.profile-value {
+    flex-grow: 1;
+}
+
+.profile-line {
+    margin-bottom: 15px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #eee;
+    color: var(--primary-color);
+}
+
 /* טפסים */
 .form-group {
     margin-bottom: 25px;
@@ -203,16 +260,18 @@ label {
 .radio-group {
     display: flex;
     gap: 20px;
+    flex-wrap: wrap;
 }
 
 .radio-option {
     display: flex;
     align-items: center;
     cursor: pointer;
+    margin-bottom: 8px;
 }
 
 .radio-option input {
-    margin-right: 8px;
+    margin-left: 8px;
     width: auto;
 }
 
@@ -400,6 +459,11 @@ button:hover {
     
     button {
         width: 100%;
+    }
+    
+    .radio-group {
+        flex-direction: column;
+        gap: 10px;
     }
 }
 

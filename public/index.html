@@ -22,6 +22,60 @@
         <!-- שלב 1: הזנת מידע בסיסי -->
         <div id="step1" class="step active">
             <h2>שלב 1: מידע בסיסי על המטופל</h2>
+            <!-- מידע פרופיל רפואי -->
+            <div class="form-group">
+                <label>פרופיל רפואי:</label>
+                <div class="radio-group">
+                    <label class="radio-option">
+                        <input type="radio" name="profile" value="97" checked> 97
+                    </label>
+                    <label class="radio-option">
+                        <input type="radio" name="profile" value="82"> 82
+                    </label>
+                    <label class="radio-option">
+                        <input type="radio" name="profile" value="64"> 64
+                    </label>
+                    <label class="radio-option">
+                        <input type="radio" name="profile" value="21"> 21
+                    </label>
+                </div>
+            </div>
+            <!-- סעיפים רפואיים -->
+            <div class="form-group">
+                <label for="medical-sections">סעיפים רפואיים:</label>
+                <input type="text" id="medical-sections" placeholder="הזן סעיפים (אם יש)">
+            </div>
+            <!-- אלרגיות -->
+            <div class="form-group">
+                <label>אלרגיות:</label>
+                <div class="radio-group">
+                    <label class="radio-option">
+                        <input type="radio" name="allergies" value="no" checked onclick="toggleAllergiesField(false)"> ללא אלרגיות ידועות
+                    </label>
+                    <label class="radio-option">
+                        <input type="radio" name="allergies" value="yes" onclick="toggleAllergiesField(true)"> יש אלרגיות
+                    </label>
+                </div>
+                <div id="allergies-details-container" style="display: none; margin-top: 10px;">
+                    <input type="text" id="allergies-details" placeholder="פרט אלרגיות...">
+                </div>
+            </div>
+            <!-- תרופות קבועות -->
+            <div class="form-group">
+                <label>נוטל/ת תרופות באופן קבוע:</label>
+                <div class="radio-group">
+                    <label class="radio-option">
+                        <input type="radio" name="medications" value="no" checked onclick="toggleMedicationsField(false)"> לא
+                    </label>
+                    <label class="radio-option">
+                        <input type="radio" name="medications" value="yes" onclick="toggleMedicationsField(true)"> כן
+                    </label>
+                </div>
+                <div id="medications-details-container" style="display: none; margin-top: 10px;">
+                    <input type="text" id="medications-details" placeholder="פרט תרופות...">
+                </div>
+            </div>
+            <!-- מידע דמוגרפי -->
             <div class="form-group">
                 <label for="patient-age">גיל:</label>
                 <input type="number" id="patient-age" min="0" max="120" required>
@@ -137,6 +191,22 @@
         </div>
     </div>
 
+    <script>
+        // פונקציות עזר לטופס
+        function toggleAllergiesField(show) {
+            document.getElementById('allergies-details-container').style.display = show ? 'block' : 'none';
+            if (!show) {
+                document.getElementById('allergies-details').value = '';
+            }
+        }
+        
+        function toggleMedicationsField(show) {
+            document.getElementById('medications-details-container').style.display = show ? 'block' : 'none';
+            if (!show) {
+                document.getElementById('medications-details').value = '';
+            }
+        }
+    </script>
     <script src="app.js"></script>
 </body>
 </html>

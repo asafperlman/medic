@@ -19,7 +19,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 // נתיבי API
 
-// קבלת שאלות דינמיות
+// קבלת שאלות דינמיות - מעודכן לתמיכה בניתוח תשובות קודמות
 app.post('/api/dynamic-questions', async (req, res) => {
   try {
     const patientRecord = req.body;
@@ -31,14 +31,11 @@ app.post('/api/dynamic-questions', async (req, res) => {
       timestamp: new Date().toISOString()
     });
     
-    // הכנת פרומפט למודל השפה
-    const prompt = llmService.createFollowupQuestionsPrompt(patientRecord);
-    
-    // שליחת הפרומפט למודל השפה
-    const response = await llmService.sendPrompt(prompt);
-    
-    // עיבוד התשובה והחזרת השאלות
-    const questions = llmService.parseFollowupQuestions(response);
+    // קבלת שאלות דינמיות מהמערכת - מעבירים גם את התשובות הקודמות לניתוח
+    const questions = medicalDataSystem.getDynamicQuestions(
+      patientRecord.patientInfo.mainComplaint,
+      patientRecord.standardAnswers || {}
+    );
     
     res.json({ questions });
   } catch (error) {
@@ -47,7 +44,7 @@ app.post('/api/dynamic-questions', async (req, res) => {
   }
 });
 
-// יצירת סיכום אנמנזה
+// יצירת סיכום אנמנזה - מעודכן לתמיכה בפרופיל
 app.post('/api/generate-summary', async (req, res) => {
   try {
     const patientRecord = req.body;
@@ -59,16 +56,13 @@ app.post('/api/generate-summary', async (req, res) => {
       timestamp: new Date().toISOString()
     });
     
-    // הכנת פרומפט למודל השפה
-    const prompt = llmService.createSummaryPrompt(patientRecord);
+    // יצירת סיכום אנמנזה עם הגדרות הפרופיל החדשות
+    const patientRecordWithSummary = medicalDataSystem.generateSummary(patientRecord);
     
-    // שליחת הפרומפט למודל השפה
-    const summaryText = await llmService.sendPrompt(prompt);
-    
-    // עיבוד הסיכום
-    const summary = llmService.processSummary(summaryText);
-    
-    res.json({ summary });
+    res.json({ 
+      summary: patientRecordWithSummary.summary,
+      redFlags: medicalDataSystem.checkForRedFlags(patientRecord)
+    });
   } catch (error) {
     console.error('שגיאה ביצירת סיכום:', error);
     res.status(500).json({ error: 'שגיאה ביצירת סיכום אנמנזה' });
@@ -97,6 +91,31 @@ app.post('/api/send-summary', async (req, res) => {
   } catch (error) {
     console.error('שגיאה בשליחת הסיכום:', error);
     res.status(500).json({ error: 'שגיאה בשליחת הסיכום' });
+  }
+});
+
+// נתיב API חדש לשמירת נתוני הפרופיל
+app.post('/api/save-profile', async (req, res) => {
+  try {
+    const { patientId, profile, medicalSections, allergies, medications } = req.body;
+    
+    // לוג אירוע אבטחה
+    securityManager.logSecurityEvent({
+      eventType: "profile_update",
+      patientId,
+      timestamp: new Date().toISOString()
+    });
+    
+    // במציאות היינו שומרים במסד נתונים
+    // כרגע רק נחזיר הצלחה
+    
+    res.json({ 
+      success: true, 
+      message: `פרופיל רפואי נשמר בהצלחה`
+    });
+  } catch (error) {
+    console.error('שגיאה בשמירת פרופיל רפואי:', error);
+    res.status(500).json({ error: 'שגיאה בשמירת פרופיל רפואי' });
   }
 });
 
