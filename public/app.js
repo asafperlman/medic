@@ -125,42 +125,187 @@ function createElement(tag, options = {}) {
  * @param {boolean} skipConfirm - האם לדלג על אישור שינויים
  */
 function showStep(stepNumber, skipConfirm = false) {
-    // בדיקת שינויים לא שמורים
+  // בדיקת שינויים לא שמורים רק אם יש שינוי אמיתי בערכים
+  if (!skipConfirm && state.unsavedChanges && state.currentStep !== stepNumber) {
+    // לפני הצגת ההודעה, בדוק אם יש שינויים משמעותיים
+    const currentFormData = collectCurrentFormData();
+    const hasSignificantChanges = checkSignificantChanges(currentFormData);
+    
+    if (hasSignificantChanges) {
+      const confirmMove = confirm("יש לך שינויים שלא נשמרו. האם אתה בטוח שברצונך לעבור לשלב אחר?");
+      if (!confirmMove) {
+        return;
+      }
+    } else {
+      // אם אין שינויים משמעותיים, איפוס המצב ללא הודעה
+      state.unsavedChanges = false;
+    }
+  }
+
+  // שאר הקוד נשאר כפי שהוא...
+}
+
+/**
+ * אוסף את המידע הנוכחי מהטופס
+ * @returns {object} - המידע הנוכחי מהטופס
+ */
+function collectCurrentFormData() {
+  // איסוף מידע ספציפי לכל שלב
+  switch (state.currentStep) {
+    case 1:
+      return {
+        age: getElement('#patient-age')?.value || '',
+        gender: getSelectedRadioValue('gender') || '',
+        mainComplaint: getElement('#main-complaint')?.value || '',
+        profile: getSelectedRadioValue('profile') || ''
+      };
+    case 2:
+      return collectAnswers('input[data-standard="true"], select[data-standard="true"], textarea[data-standard="true"], input[type="hidden"][data-standard="true"]');
+    case 3:
+      return collectAnswers('input[data-dynamic="true"], select[data-dynamic="true"], textarea[data-dynamic="true"], input[type="hidden"][data-dynamic="true"]');
+    default:
+      return {};
+  }
+}
+
+/**
+ * בודק אם יש שינויים משמעותיים בטופס
+ * @param {object} currentData - המידע הנוכחי מהטופס
+ * @returns {boolean} - האם יש שינויים משמעותיים
+ */
+function checkSignificantChanges(currentData) {
+  // אם אין מידע קודם, אין שינויים משמעותיים
+  if (!state.patientRecord) return false;
+  
+  // בדיקה לפי השלב הנוכחי
+  switch (state.currentStep) {
+    case 1:
+      // בדיקה אם מולאו שדות חשובים
+      return currentData.age || currentData.mainComplaint;
+    case 2:
+    case 3:
+      // בדיקה אם יש תשובות כלשהן
+      return Object.keys(currentData).length > 0;
+    default:
+      return false;
+  }
+}/**
+/**
+ * פונקציה להצגת שלב מסוים, ממוטבת לביצועים
+ * @param {number} stepNumber - מספר השלב להצגה
+ * @param {boolean} skipConfirm - האם לדלג על אישור שינויים
+ */
+function showStep(stepNumber, skipConfirm = false) {
+    // בדיקת שינויים לא שמורים רק אם יש שינוי אמיתי בערכים
     if (!skipConfirm && state.unsavedChanges && state.currentStep !== stepNumber) {
+      // לפני הצגת ההודעה, בדוק אם יש שינויים משמעותיים
+      const currentFormData = collectCurrentFormData();
+      const hasSignificantChanges = checkSignificantChanges(currentFormData);
+      
+      if (hasSignificantChanges) {
         const confirmMove = confirm("יש לך שינויים שלא נשמרו. האם אתה בטוח שברצונך לעבור לשלב אחר?");
         if (!confirmMove) {
-            return;
+          return;
         }
+      } else {
+        // אם אין שינויים משמעותיים, איפוס המצב ללא הודעה
+        state.unsavedChanges = false;
+      }
     }
-
-    // מסתיר את כל השלבים (מבצע DOM update אחד לכל שלב במקום רבים)
-    const steps = document.querySelectorAll('.step');
-    steps.forEach(step => step.classList.remove('active'));
+  
+    // שאר הקוד נשאר כפי שהוא...
+  }
+  
+  /**
+   * אוסף את המידע הנוכחי מהטופס
+   * @returns {object} - המידע הנוכחי מהטופס
+   */
+  function collectCurrentFormData() {
+    // איסוף מידע ספציפי לכל שלב
+    switch (state.currentStep) {
+      case 1:
+        return {
+          age: getElement('#patient-age')?.value || '',
+          gender: getSelectedRadioValue('gender') || '',
+          mainComplaint: getElement('#main-complaint')?.value || '',
+          profile: getSelectedRadioValue('profile') || ''
+        };
+      case 2:
+        return collectAnswers('input[data-standard="true"], select[data-standard="true"], textarea[data-standard="true"], input[type="hidden"][data-standard="true"]');
+      case 3:
+        return collectAnswers('input[data-dynamic="true"], select[data-dynamic="true"], textarea[data-dynamic="true"], input[type="hidden"][data-dynamic="true"]');
+      default:
+        return {};
+    }
+  }
+  
+  /**
+   * בודק אם יש שינויים משמעותיים בטופס
+   * @param {object} currentData - המידע הנוכחי מהטופס
+   * @returns {boolean} - האם יש שינויים משמעותיים
+   */
+  function checkSignificantChanges(currentData) {
+    // אם אין מידע קודם, אין שינויים משמעותיים
+    if (!state.patientRecord) return false;
     
-    // מציג את השלב הנבחר
-    const targetStep = getElement(`#step${stepNumber}`);
-    if (targetStep) {
-        targetStep.classList.add('active');
-        
-        // מעדכן את המצב הנוכחי
-        state.currentStep = stepNumber;
-        
-        // עדכון סרגל ההתקדמות
-        updateProgressBar();
-        
-        // עדכון תצוגת לחצנים לפי השלב הנוכחי
-        updateButtonsVisibility();
-        
-        // להפחתת reflow, נבצע ריצוד בלעדי לכל השלבים (צמצום פעולות DOM)
-        requestAnimationFrame(() => {
-            // טריגר למעברי אנימציה (אם יש)
-            targetStep.querySelectorAll('.fade-in').forEach(element => {
-                element.classList.remove('fade-in');
-                void element.offsetWidth; // Trigger reflow
-                element.classList.add('fade-in');
-            });
-        });
+    // בדיקה לפי השלב הנוכחי
+    switch (state.currentStep) {
+      case 1:
+        // בדיקה אם מולאו שדות חשובים
+        return currentData.age || currentData.mainComplaint;
+      case 2:
+      case 3:
+        // בדיקה אם יש תשובות כלשהן
+        return Object.keys(currentData).length > 0;
+      default:
+        return false;
     }
+  }
+
+/**
+ * אוסף את המידע הנוכחי מהטופס
+ * @returns {object} - המידע הנוכחי מהטופס
+ */
+function collectCurrentFormData() {
+  // איסוף מידע ספציפי לכל שלב
+  switch (state.currentStep) {
+    case 1:
+      return {
+        age: getElement('#patient-age')?.value || '',
+        gender: getSelectedRadioValue('gender') || '',
+        mainComplaint: getElement('#main-complaint')?.value || '',
+        profile: getSelectedRadioValue('profile') || ''
+      };
+    case 2:
+      return collectAnswers('input[data-standard="true"], select[data-standard="true"], textarea[data-standard="true"], input[type="hidden"][data-standard="true"]');
+    case 3:
+      return collectAnswers('input[data-dynamic="true"], select[data-dynamic="true"], textarea[data-dynamic="true"], input[type="hidden"][data-dynamic="true"]');
+    default:
+      return {};
+  }
+}
+
+/**
+ * בודק אם יש שינויים משמעותיים בטופס
+ * @param {object} currentData - המידע הנוכחי מהטופס
+ * @returns {boolean} - האם יש שינויים משמעותיים
+ */
+function checkSignificantChanges(currentData) {
+  // אם אין מידע קודם, אין שינויים משמעותיים
+  if (!state.patientRecord) return false;
+  
+  // בדיקה לפי השלב הנוכחי
+  switch (state.currentStep) {
+    case 1:
+      // בדיקה אם מולאו שדות חשובים
+      return currentData.age || currentData.mainComplaint;
+    case 2:
+    case 3:
+      // בדיקה אם יש תשובות כלשהן
+      return Object.keys(currentData).length > 0;
+    default:
+      return false;
+  }
 }
 
 /**
@@ -1329,6 +1474,7 @@ function createVitalSignsForm(relevantVitalSigns) {
             min: 8,
             max: 60
         }
+        
     };
     
     // יצירת פרגמנט לביצועים טובים
@@ -1374,7 +1520,11 @@ function createVitalSignsForm(relevantVitalSigns) {
     container.appendChild(title);
     container.appendChild(form);
     
-    return container;
+    setTimeout(() => {
+        updateVitalSignInputAttributes();
+      }, 0);
+      
+      return container;
 }
 
 /**
@@ -1962,7 +2112,80 @@ async function generateSummary(patientRecord) {
       return patientRecord;
     }
   }
+
+/**
+ * קבלת המלצות טיפוליות מבוססות AI
+ * @param {object} patientRecord - רשומת המטופל
+ * @returns {Promise<string>} - הטקסט עם ההמלצות
+ */
+
+// פונקציה שמתקנת את שדה הטמפרטורה כך שיאפשר מספרים עשרוניים
+function fixTemperatureField() {
+    // מוצא את כל שדות הטמפרטורה בעמוד
+    const tempInputs = document.querySelectorAll('input[data-vital-sign="temperature"]');
+    
+    // לכל שדה טמפרטורה:
+    tempInputs.forEach(input => {
+      // מגדיר שזה שדה מספרי
+      input.type = "number";
+      // מגדיר ערך מינימלי
+      input.min = "35";
+      // מגדיר ערך מקסימלי 
+      input.max = "43";
+      // מגדיר שניתן להזין מספרים עם נקודה עשרונית
+      input.step = "0.1";
+      // דוגמה לערך בשדה
+      input.placeholder = "36.8";
+    });
+  }
+async function getAITreatmentRecommendations(patientRecord) {
+    try {
+      // בדיקת חיבור לאינטרנט ומפתח API
+      if (!navigator.onLine || !window.OPENAI_API_KEY) {
+        // אם אין חיבור, השתמש בהמלצות מקומיות
+        return MedicalGuide.generateRecommendationsText(
+          patientRecord.patientInfo.mainComplaint,
+          patientRecord
+        );
+      }
+      
+      // שליחת בקשה לשרת
+      const response = await fetch('/api/get-treatment-recommendations', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ patientRecord })
+      });
+      
+      if (!response.ok) {
+        throw new Error(`שגיאת שרת: ${response.status}`);
+      }
+      
+      const result = await response.json();
+      
+      if (result.success && result.recommendations) {
+        return result.recommendations;
+      } else {
+        throw new Error("תשובה לא תקינה מהשרת");
+      }
+    } catch (error) {
+      console.error("שגיאה בקבלת המלצות טיפוליות:", error);
+      
+      // במקרה של שגיאה, השתמש בהמלצות מקומיות
+      return MedicalGuide.generateRecommendationsText(
+        patientRecord.patientInfo.mainComplaint,
+        patientRecord
+      );
+    }
+  }
 function initializeApplication() {
+    // הוספת אינדיקטור מצב API
+    const header = document.querySelector('header');
+    if (header) {
+        const apiIndicator = createApiStatusIndicator();
+        header.appendChild(apiIndicator);
+    }
     console.time('app-initialization');
     
     // איפוס מטמון אלמנטים
@@ -2072,7 +2295,24 @@ function initializeApplication() {
     
     console.timeEnd('app-initialization');
 }
-
+/**
+ * בדיקת חיבור לאינטרנט והגדרת מפתח OpenAI API
+ */
+function setupOpenAIConnection() {
+    // הגדרת מפתח API כמשתנה גלובלי שניתן לגשת אליו
+    window.OPENAI_API_KEY = 'your_api_key_here'; // החלף במפתח האמיתי שלך
+    
+    // בדיקת חיבור אינטרנט פעיל
+    window.addEventListener('online', () => {
+      console.log("חיבור לאינטרנט פעיל - API זמין");
+      showToast('info', 'חיבור לאינטרנט פעיל - ניתן להשתמש בשאלות AI');
+    });
+    
+    window.addEventListener('offline', () => {
+      console.log("אין חיבור לאינטרנט - משתמש בשאלות מקומיות בלבד");
+      showToast('warning', 'אין חיבור לאינטרנט - משתמש בשאלות מקומיות בלבד');
+    });
+  }
 /**
  * אתחול כפתורי הניווט בין השלבים
  * ממוטב לביצועים טובים יותר
@@ -3108,24 +3348,50 @@ async function getDynamicQuestionsFromChatGPT(complaint, previousAnswers) {
  * @param {object} previousAnswers - תשובות קודמות
  * @returns {Promise<Array>} - מערך של שאלות דינמיות
  */
+/**
+ * פונקציה לקבלת שאלות דינמיות מהשרת
+ * @param {string} complaint - התלונה העיקרית
+ * @param {object} previousAnswers - תשובות קודמות
+ * @returns {Promise<Array>} - מערך של שאלות דינמיות
+ */
 async function getDynamicQuestions(complaint, previousAnswers) {
     // 1. קבלת שאלות מקומיות
     const localQuestions = getLocalDynamicQuestions(complaint, previousAnswers);
     
     try {
-      // 2. ניסיון לקבל שאלות מ-ChatGPT
+      // 2. ניסיון לקבל שאלות מהשרת (ChatGPT)
       if (navigator.onLine && window.OPENAI_API_KEY) {
-        console.log("מבקש שאלות נוספות מ-ChatGPT API...");
+        console.log("מבקש שאלות נוספות מהשרת...");
         
-        const gptQuestions = await getDynamicQuestionsFromChatGPT(complaint, previousAnswers);
+        // הצגת הודעה למשתמש
+        showToast('info', 'מייצר שאלות מותאמות אישית...');
         
-        if (gptQuestions && gptQuestions.length > 0) {
-          console.log(`התקבלו ${gptQuestions.length} שאלות מ-ChatGPT API`);
-          return [...localQuestions, ...gptQuestions];
+        // שליחת בקשה לשרת
+        const response = await fetch('/api/get-dynamic-questions', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ complaint, previousAnswers })
+        });
+        
+        if (!response.ok) {
+          throw new Error(`שגיאת שרת: ${response.status}`);
+        }
+        
+        const result = await response.json();
+        
+        if (result.success && result.questions && result.questions.length > 0) {
+          console.log(`התקבלו ${result.questions.length} שאלות מהשרת`);
+          showToast('success', 'התקבלו שאלות מותאמות אישית');
+          
+          // שלב משולב: קודם שאלות מקומיות ואחריהן שאלות AI
+          return [...localQuestions, ...result.questions];
         }
       }
     } catch (error) {
-      console.error("שגיאה בקבלת שאלות מ-ChatGPT API:", error);
+      console.error("שגיאה בקבלת שאלות מהשרת:", error);
+      showToast('warning', 'לא ניתן היה לקבל שאלות מותאמות אישית - משתמש בשאלות מקומיות');
     }
     
     // 3. במקרה של שגיאה, החזר רק שאלות מקומיות
@@ -3335,5 +3601,7 @@ async function getDynamicQuestions(complaint, previousAnswers) {
   
 
 // ======== הפעלת האפליקציה בטעינת הדף ========
-
-document.addEventListener('DOMContentLoaded', initializeApplication);
+document.addEventListener('DOMContentLoaded', () => {
+    initializeApplication();
+    setupOpenAIConnection();
+  });

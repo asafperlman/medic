@@ -331,3 +331,136 @@ app.post('/api/get-dynamic-questions', async (req, res) => {
 });
 
 
+// נתיב API חדש להמלצות טיפוליות מבוססות AI
+app.post('/api/get-treatment-recommendations', async (req, res) => {
+  try {
+    const { patientRecord } = req.body;
+    
+    // לוג אירוע אבטחה
+    securityManager.logSecurityEvent({
+      eventType: "api_access",
+      endpoint: "/api/get-treatment-recommendations",
+      timestamp: new Date().toISOString()
+    });
+    
+    // יצירת פרומפט מותאם להמלצות טיפוליות
+    const prompt = `
+      אתה יועץ רפואי מקצועי. בהתבסס על המידע הבא, ספק המלצות טיפוליות מפורטות וברורות.
+      
+      פרטי המטופל:
+      - גיל: ${patientRecord.patientInfo.age}
+      - מין: ${patientRecord.patientInfo.gender === 'male' ? 'זכר' : 'נקבה'}
+      - תלונה עיקרית: ${patientRecord.patientInfo.mainComplaint}
+      - פרופיל רפואי: ${patientRecord.patientInfo.profile}
+      - אלרגיות: ${patientRecord.patientInfo.allergies}
+      - תרופות קבועות: ${patientRecord.patientInfo.medications}
+      ${patientRecord.patientInfo.smoking === 'yes' ? '- מעשן/ת' : '- לא מעשן/ת'}
+      
+      מידע מהאנמנזה:
+      ${Object.entries(patientRecord.standardAnswers || {})
+        .map(([q, a]) => `- ${q}: ${a}`)
+        .join('\n')}
+      ${Object.entries(patientRecord.dynamicAnswers || {})
+        .map(([q, a]) => `- ${q}: ${a}`)
+        .join('\n')}
+      
+      מדדים חיוניים:
+      ${Object.entries(patientRecord.vitalSigns || {})
+        .map(([key, value]) => `- ${key}: ${value}`)
+        .join('\n')}
+      
+      ספק המלצות טיפוליות שכוללות:
+      1. המלצות טיפול עצמי והקלה בבית
+      2. המלצות לגבי תרופות ללא מרשם (אם רלוונטי)
+      3. מתי מומלץ לפנות לרופא/ה (סימנים מדאיגים)
+      4. מידע על משך זמן צפוי להחלמה והמשך טיפול
+      
+      פורמט את התשובה תחת הכותרת "המלצות לטיפול:" וארגן אותה בסעיפים ברורים.
+    `;
+    
+    // שליחת הפרומפט ל-LLM
+    const recommendations = await llmService.sendPrompt(prompt);
+    
+    res.json({
+      success: true,
+      recommendations
+    });
+  } catch (error) {
+    console.error('שגיאה בהפקת המלצות טיפוליות:', error);
+    
+    // במקרה של שגיאה, שימוש בפונקציה מקומית
+    const localRecommendations = medicalDataSystem.generateRecommendations 
+      ? medicalDataSystem.generateRecommendations(req.body.patientRecord)
+      : "לא ניתן היה להפיק המלצות טיפוליות בשל תקלה טכנית.";
+    
+    res.json({
+      success: true,
+      recommendations: localRecommendations,
+      source: 'local'
+    });
+  }
+});
+
+// הוסף גם את הנתיב הבא
+app.post('/api/get-dynamic-questions', async (req, res) => {
+  try {
+    const { complaint, previousAnswers } = req.body;
+    
+    // לוג אירוע אבטחה
+    securityManager.logSecurityEvent({
+      eventType: "api_access",
+      endpoint: "/api/get-dynamic-questions",
+      timestamp: new Date().toISOString()
+    });
+    
+    // בניית פרומפט לשאלות המשך
+    const prompt = `
+      התלונה העיקרית של המטופל/ת: "${complaint}"
+      
+      התשובות הקודמות שניתנו הן:
+      ${JSON.stringify(previousAnswers, null, 2)}
+      
+      אנא צור/י 3 עד 5 שאלות המשך רפואיות נוספות, רלוונטיות וממוקדות,
+      בעברית. כתוב/י כל שאלה בשורה חדשה, ללא מספור וללא פרטים נוספים.
+    `.trim();
+    
+    // שליחת בקשה לשירות ה-LLM
+    const responseText = await llmService.sendPrompt(prompt);
+    
+    // פרסור התשובה לשאלות נפרדות
+    const lines = responseText.split('\n')
+      .map(line => line.trim())
+      .filter(Boolean)
+      .filter(line => line.endsWith('?'));
+    
+    // יצירת מערך שאלות במבנה הנדרש
+    const gptQuestions = lines.map(question => ({
+      type: 'multiline',
+      question: question
+    }));
+    
+    // קבלת שאלות מקומיות סטנדרטיות
+    const localQuestions = medicalDataSystem.getDynamicQuestions(complaint, previousAnswers);
+    
+    // שילוב השאלות המקומיות והשאלות מ-ChatGPT
+    const combinedQuestions = [...localQuestions, ...gptQuestions];
+    
+    res.json({ 
+      success: true, 
+      questions: combinedQuestions,
+      source: gptQuestions.length > 0 ? 'ai' : 'local'
+    });
+  } catch (error) {
+    console.error('שגיאה בקבלת שאלות מ-ChatGPT:', error);
+    
+    // במקרה של שגיאה, החזר רק שאלות מקומיות
+    const localQuestions = medicalDataSystem.getDynamicQuestions(req.body.complaint, req.body.previousAnswers);
+    
+    res.json({ 
+      success: true, 
+      questions: localQuestions,
+      source: 'local',
+      error: 'שימוש בשאלות מקומיות בשל שגיאה בקריאת API'
+    });
+  }
+});

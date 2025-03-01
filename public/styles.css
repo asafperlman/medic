@@ -1557,3 +1557,56 @@ button:hover {
         margin-top: 5px;
     }
 }
+/* אינדיקטור מצב API */
+.api-status-indicator {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    border-radius: 20px;
+    background-color: #f0f0f0;
+    position: absolute;
+    top: 15px;
+    left: 15px;
+    font-size: 14px;
+    transition: all 0.3s ease;
+  }
+  
+  .api-status-indicator i {
+    font-size: 16px;
+  }
+  
+  .api-active {
+    background-color: #d4edda;
+    color: #155724;
+  }
+  
+  .api-inactive {
+    background-color: #fff3cd;
+    color: #856404;
+  }
+  
+  .api-offline {
+    background-color: #f8d7da;
+    color: #721c24;
+  }
+  
+  /* התאמה למצב כהה */
+  [data-theme="dark"] .api-status-indicator {
+    background-color: #343a40;
+  }
+  
+  [data-theme="dark"] .api-active {
+    background-color: #204d20;
+    color: #d4edda;
+  }
+  
+  [data-theme="dark"] .api-inactive {
+    background-color: #534a1d;
+    color: #fff3cd;
+  }
+  
+  [data-theme="dark"] .api-offline {
+    background-color: #4d2020;
+    color: #f8d7da;
+  }

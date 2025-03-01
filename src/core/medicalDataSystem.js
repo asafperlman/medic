@@ -688,7 +688,34 @@ const MedicalDataSystem = {
       const genderText = gender === 'male' ? 'זכר' : 'נקבה';
       
       // פתיחת האנמנזה עם פרטי הפרופיל הרפואי
-      let summary = `פרופיל ${profile}, ${medicalSections}, ${allergies}, ${medications}.\n\n`;
+      // פתיחת האנמנזה עם פרטי הפרופיל הרפואי בפורמט משופר
+      let summary = '';
+
+      // פורמט פרופיל רפואי
+      summary += `פרופיל ${profile}`;
+
+      // הוספת סעיפים רפואיים בצורה מסודרת
+      if (medicalSections && medicalSections.trim() !== "ללא סעיפים") {
+        summary += `, ${medicalSections}`;
+      } else {
+        summary += ", ללא סעיפים";
+      }
+
+      // פורמט אלרגיות מסודר
+      if (allergies && allergies !== "ללא אלרגיות ידועות") {
+        summary += `, אלרגיות: ${allergies}`;
+      } else {
+        summary += ", ללא אלרגיות ידועות";
+      }
+
+      // פורמט תרופות מסודר
+      if (medications && medications !== "לא נוטל תרופות באופן קבוע") {
+        summary += `, נוטל/ת: ${medications}`;
+      } else {
+        summary += ", לא נוטל/ת תרופות באופן קבוע";
+      }
+
+      summary += ".\n\n";
       
       // תיאור דמוגרפי ותלונה עיקרית
       summary += `מטופל/ת בגיל ${age}, ${genderText}, ${smoking === 'yes' ? 'מעשן/ת' : 'לא מעשן/ת'}, מתלונן/ת על ${mainComplaint}`;
