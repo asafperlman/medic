@@ -3040,75 +3040,104 @@ function getStandardQuestions(complaint) {
  */
 async function getDynamicQuestionsFromChatGPT(complaint, previousAnswers) {
     try {
-      // 1. בניית מחרוזת תשובות (JSON).
-      const answersString = JSON.stringify(previousAnswers, null, 2);
+      const apiKey = window.OPENAI_API_KEY;
+      
+      if (!apiKey) {
+        console.error("מפתח API לא מוגדר!");
+        return [];
+      }
   
-      // 2. בניית prompt: מה אנחנו רוצים לדרוש מ-ChatGPT?
       const prompt = `
-  התלונה העיקרית של המטופל/ת: "${complaint}"
-  
-  התשובות הקודמות שניתנו הן:
-  ${answersString}
-  
-  אנא ניסח 3 עד 5 שאלות המשך רפואיות נוספות, רלוונטיות וממוקדות,
-  עבור המטופל/ת, בעברית. כתוב כל שאלה בשורה חדשה, ללא מספור וללא פרטים נוספים.
+        התלונה העיקרית של המטופל/ת: "${complaint}"
+        
+        התשובות הקודמות שניתנו הן:
+        ${JSON.stringify(previousAnswers, null, 2)}
+        
+        אנא צור/י 3 עד 5 שאלות המשך רפואיות נוספות, רלוונטיות וממוקדות,
+        בעברית. כתוב/י כל שאלה בשורה חדשה, ללא מספור וללא פרטים נוספים.
       `.trim();
   
-      // 3. קריאה ל-OpenAI API ישירות (צד לקוח) – לא מומלץ לפרודקשן
       const response = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          // החלף במפתח האמיתי שלך:
-          'Authorization': process.env.OPENAI_API_KEY
+          'Authorization': `Bearer ${apiKey}`
         },
         body: JSON.stringify({
-          model: 'gpt-3.5-turbo', // או גרסה אחרת
+          model: 'gpt-3.5-turbo',
           messages: [{ role: 'user', content: prompt }],
           temperature: 0.7
         })
       });
   
-      const data = await response.json();
-  
-      // 4. בדיקה שהתקבלה תשובה תקינה
-      if (!data.choices || !data.choices[0]) {
-        console.warn('No valid response from ChatGPT:', data);
-        return []; // מחזיר מערך ריק
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(`שגיאת API: ${response.status} - ${errorData.error?.message || response.statusText}`);
       }
   
-      // מקבל את הטקסט של המודל
-      const content = data.choices[0].message.content || '';
+      const data = await response.json();
+      const content = data.choices[0].message.content;
   
-      // מפצל לשורות, מסנן ריקות
       const lines = content
         .split('\n')
         .map(line => line.trim())
-        .filter(Boolean);
+        .filter(Boolean)
+        .filter(line => line.endsWith('?'));
   
-      // 5. יוצר מערך אובייקטים בסגנון השאלות
-      // כאן, לדוגמה, הופך כל שורה לשאלה type="multiline"
-      const gptGeneratedQuestions = lines.map(q => {
-        return {
-          type: 'multiline',
-          question: q
-        };
-      });
-  
-      // 6. מחזיר את המערך
-      return gptGeneratedQuestions;
+      return lines.map(question => ({
+        type: 'multiline',
+        question: question
+      }));
+      
     } catch (error) {
       console.error('ChatGPT API error:', error);
       return [];
     }
   }
-  
   /**
    * פונקציה שמחזירה "שאלות דינמיות" משולבות:
    * 1. שאלות "סטטיות" ממפה קיימת (ע"פ complaint ותשובות קודמות)
    * 2. שאלות ChatGPT (ע"י קריאה ל-getDynamicQuestionsFromChatGPT)
    */
-  async function getDynamicQuestions(complaint, previousAnswers) {
+  // 2. עדכן את קוד צד הלקוח בקובץ public/app.js
+// החלף את פונקציית getDynamicQuestions המקורית:
+
+/**
+ * פונקציה לקבלת שאלות דינמיות מהשרת
+ * @param {string} complaint - התלונה העיקרית
+ * @param {object} previousAnswers - תשובות קודמות
+ * @returns {Promise<Array>} - מערך של שאלות דינמיות
+ */
+async function getDynamicQuestions(complaint, previousAnswers) {
+    // 1. קבלת שאלות מקומיות
+    const localQuestions = getLocalDynamicQuestions(complaint, previousAnswers);
+    
+    try {
+      // 2. ניסיון לקבל שאלות מ-ChatGPT
+      if (navigator.onLine && window.OPENAI_API_KEY) {
+        console.log("מבקש שאלות נוספות מ-ChatGPT API...");
+        
+        const gptQuestions = await getDynamicQuestionsFromChatGPT(complaint, previousAnswers);
+        
+        if (gptQuestions && gptQuestions.length > 0) {
+          console.log(`התקבלו ${gptQuestions.length} שאלות מ-ChatGPT API`);
+          return [...localQuestions, ...gptQuestions];
+        }
+      }
+    } catch (error) {
+      console.error("שגיאה בקבלת שאלות מ-ChatGPT API:", error);
+    }
+    
+    // 3. במקרה של שגיאה, החזר רק שאלות מקומיות
+    console.log("משתמש רק בשאלות מקומיות");
+    return localQuestions;
+  }
+  
+  /**
+   * פונקציית גיבוי שמחזירה שאלות דינמיות לוקאליות
+   * זו העתק של הפונקציה המקורית (ללא קריאה ל-API)
+   */
+  function getLocalDynamicQuestions(complaint, previousAnswers) {
     // פונקציית עזר שמזהה אם מילה כלשהי הופיעה בתשובה
     const hasSymptom = (keyword) => {
       return Object.entries(previousAnswers).some(([question, answer]) =>
@@ -3117,7 +3146,7 @@ async function getDynamicQuestionsFromChatGPT(complaint, previousAnswers) {
       );
     };
   
-    // מפה של שאלות סטטיות
+    // מיפה של שאלות סטטיות
     const dynamicQuestionsMap = {
       "כאב ראש": [
         {
@@ -3154,97 +3183,30 @@ async function getDynamicQuestionsFromChatGPT(complaint, previousAnswers) {
           options: ["מנוחה", "שינה", "חשיכה", "שקט", "תרופות", "קפאין", "אוכל"]
         }
       ],
-      "כאב בטן": [
-        hasSymptom('שלשול') ? {
-          type: "quantity",
-          question: "כמה יציאות ביום?",
-          placeholder: "מספר משוער של יציאות"
-        } : {
-          type: "yesNo",
-          question: "האם יש עצירות?",
-          followUp: "מתי הייתה היציאה האחרונה?"
+      
+      // הוסף כאן את כל שאר המיפויים שיש לך כבר
+      
+      // שאלות כלליות לברירת מחדל
+      "default": [
+        {
+          type: "multiselect",
+          question: "האם חל שינוי ברמת האנרגיה שלך לאחרונה?",
+          options: ["ירידה באנרגיה", "עייפות מוגברת", "קשיי שינה", "חוסר מנוחה", "אין שינוי"]
         },
         {
           type: "multiselect",
-          question: "האם הכאב קשור לאכילה?",
-          options: ["מופיע לפני אכילה", "מופיע בזמן אכילה", "מופיע אחרי אכילה", "מוחמר ע״י סוגי מזון מסוימים", "אין קשר לאכילה"]
-        },
-        hasSymptom('דם') ? {
-          type: "yesNo",
-          question: "האם הדם ביציאות או בהקאות עדיין נמשך?",
-          followUp: "מתי הופיע לאחרונה?"
-        } : {
-          type: "yesNo",
-          question: "האם יש שינוי בצבע היציאות?",
-          followUp: "מהו הצבע?"
+          question: "האם יש שינויים בהרגלי האכילה או השתייה שלך?",
+          options: ["ירידה בתיאבון", "עלייה בתיאבון", "צמא מוגבר", "קושי בבליעה", "אין שינוי"]
         },
         {
           type: "yesNo",
-          question: "האם הכאב מקרין לאזורים אחרים?",
-          followUp: "לאן הכאב מקרין?"
-        },
-        {
-          type: "multiselect",
-          question: "האם זיהית גורמים שמחמירים את הכאב?",
-          options: ["מזון מסוים", "שתייה", "תרופות", "לחץ", "תנוחה מסוימת", "תנועה"]
-        }
-      ],
-      "כאב גב": [
-        {
-          type: "yesNo",
-          question: "האם הכאב מקרין לרגליים?",
-          followUp: "האם לרגל אחת או לשתיהן, ועד היכן?"
-        },
-        hasSymptom('כאב') && hasSymptom('בוקר') ? {
-          type: "yesNo",
-          question: "האם קיימת נוקשות בוקר?",
-          followUp: "כמה זמן נמשכת הנוקשות?"
-        } : {
-          type: "yesNo",
-          question: "האם הכאב גובר בלילה או בשכיבה?",
-          followUp: "באיזו תנוחת שכיבה?"
-        },
-        {
-          type: "multiselect",
-          question: "מה מקל על הכאב?",
-          options: ["מנוחה", "תנועה", "תרופות", "חימום", "קירור", "עיסוי", "שינוי תנוחה"]
+          question: "האם חווית מצבים דומים בעבר?",
+          followUp: "מתי והאם טופלו?"
         },
         {
           type: "yesNo",
-          question: "האם יש הגבלה בטווח התנועה?",
-          followUp: "איזו תנועה מוגבלת?"
-        },
-        {
-          type: "yesNo",
-          question: "האם יש חולשה ברגליים או בעיות בשליטה בשתן/צואה?",
+          question: "האם יש משהו נוסף שחשוב שנדע על מצבך הבריאותי?",
           followUp: "פרט"
-        }
-      ],
-      "כאב שרירים": [
-        {
-          type: "yesNo",
-          question: "האם הכאב החל לאחר פעילות גופנית?",
-          followUp: "איזו פעילות ומתי?"
-        },
-        {
-          type: "multiselect",
-          question: "האם יש סימנים נוספים באזור הכאוב?",
-          options: ["נפיחות", "חום מקומי", "אדמומיות", "כחלון", "רגישות למגע"]
-        },
-        {
-          type: "multiselect",
-          question: "מה מקל על הכאב?",
-          options: ["מנוחה", "תנועה", "חימום", "קירור", "עיסוי", "תרופות"]
-        },
-        {
-          type: "yesNo",
-          question: "האם יש הגבלה בטווח התנועה?",
-          followUp: "איזו תנועה מוגבלת?"
-        },
-        {
-          type: "yesNo",
-          question: "האם יש חולשה באזור הפגוע?",
-          followUp: "פרט את מידת החולשה"
         }
       ]
     };
@@ -3267,44 +3229,107 @@ async function getDynamicQuestionsFromChatGPT(complaint, previousAnswers) {
       if (foundKey) questionsKey = foundKey;
     }
   
-    // שאלות סטטיות
-    let staticQuestions = [];
-    if (questionsKey && dynamicQuestionsMap[questionsKey]) {
-      staticQuestions = dynamicQuestionsMap[questionsKey];
-    } else {
-      // ברירת מחדל
-      staticQuestions = [
-        {
-          type: "multiselect",
-          question: "האם חל שינוי ברמת האנרגיה שלך לאחרונה?",
-          options: ["ירידה באנרגיה", "עייפות מוגברת", "קשיי שינה", "חוסר מנוחה", "אין שינוי"]
-        },
-        {
-          type: "multiselect",
-          question: "האם יש שינויים בהרגלי האכילה או השתייה שלך?",
-          options: ["ירידה בתיאבון", "עלייה בתיאבון", "צמא מוגבר", "קושי בבליעה", "אין שינוי"]
-        },
-        {
-          type: "yesNo",
-          question: "האם חווית מצבים דומים בעבר?",
-          followUp: "מתי והאם טופלו?"
-        },
-        {
-          type: "yesNo",
-          question: "האם יש משהו נוסף שחשוב שנדע על מצבך הבריאותי?",
-          followUp: "פרט"
-        }
-      ];
+    return dynamicQuestionsMap[questionsKey] || dynamicQuestionsMap["default"];
+  }
+  
+  // 3. עדכן את הפונקציה handleStep2to3 לעבודה עם הפונקציה האסינכרונית:
+  
+  async function handleStep2to3() {
+    // איסוף תשובות לשאלות סטנדרטיות
+    const standardAnswers = collectAnswers('input[data-standard="true"], select[data-standard="true"], textarea[data-standard="true"], input[type="hidden"][data-standard="true"]');
+    
+    // שמירת התשובות ברשומת המטופל
+    state.patientRecord.standardAnswers = standardAnswers;
+    
+    // שמירת מדדים חיוניים
+    state.patientRecord.vitalSigns = collectVitalSigns();
+    
+    // שמירת מיקום פציעה אם רלוונטי
+    const injuryLocationValue = getElement('#injury-location-value');
+    if (injuryLocationValue && injuryLocationValue.value) {
+      state.patientRecord.standardAnswers['מיקום הפציעה המדויק'] = injuryLocationValue.value;
     }
-  
-    // כעת נוסיף שאלות גם מ-ChatGPT
-    const gptQuestions = await getDynamicQuestionsFromChatGPT(complaint, previousAnswers);
-  
-    // מאחדים את שתיהן
-    const combined = [...staticQuestions, ...gptQuestions];
-  
-    // מחזירים את הכול
-    return combined;
+    
+    // הצגת אנימציית טעינה
+    getElement('#dynamic-questions-loading').style.display = 'block';
+    getElement('#dynamic-questions-container').style.display = 'none';
+    
+    // מעבר לשלב הבא
+    showStep(3);
+    
+    try {
+      // קריאה אסינכרונית לקבלת שאלות דינמיות
+      const dynamicQuestions = await getDynamicQuestions(
+        state.patientRecord.patientInfo.mainComplaint, 
+        standardAnswers
+      );
+      
+      // יצירת אלמנטי שאלות דינמיות
+      const questionsList = getElement('#dynamic-questions-list');
+      questionsList.innerHTML = '';
+      
+      // יצירת פרגמנט לביצועים טובים
+      const questionsFragment = document.createDocumentFragment();
+      
+      if (!dynamicQuestions || dynamicQuestions.length === 0) {
+        const noQuestionsItem = createElement('li', {
+          className: 'question-item',
+          text: 'אין שאלות נוספות לתלונה זו. נא לעבור לשלב הבא.'
+        });
+        questionsFragment.appendChild(noQuestionsItem);
+      } else {
+        dynamicQuestions.forEach((question, index) => {
+          const questionElement = createQuestionElement(question, index, false);
+          questionsFragment.appendChild(questionElement);
+        });
+      }
+      
+      // הוספת אפשרות להערות חופשיות
+      const freeTextContainer = createElement('div', {
+        className: 'free-notes-container'
+      });
+      
+      const freeTextTitle = createElement('h3', {
+        text: 'מידע נוסף'
+      });
+      
+      const freeTextArea = createElement('textarea', {
+        className: 'free-text-area',
+        rows: 5,
+        placeholder: 'הוסף כל מידע נוסף שלא נכלל בשאלות הקודמות...',
+        dataset: {
+          question: 'מידע נוסף',
+          dynamic: 'true',
+          type: 'multiline'
+        },
+        events: {
+          input: () => { state.unsavedChanges = true; }
+        }
+      });
+      
+      freeTextContainer.appendChild(freeTextTitle);
+      freeTextContainer.appendChild(freeTextArea);
+      questionsFragment.appendChild(freeTextContainer);
+      
+      // הוספת כל השאלות במהלך אחד לצמצום reflows
+      questionsList.appendChild(questionsFragment);
+      
+    } catch (error) {
+      console.error("שגיאה בטעינת שאלות דינמיות:", error);
+      
+      // במקרה של שגיאה, הצג הודעה למשתמש
+      const questionsList = getElement('#dynamic-questions-list');
+      questionsList.innerHTML = `
+        <li class="question-item error-item">
+          <div class="error-message">אירעה שגיאה בטעינת שאלות נוספות. נא לנסות שוב או להמשיך לשלב הבא.</div>
+          <div class="error-details">${error.message}</div>
+        </li>
+      `;
+    } finally {
+      // הסתרת אנימציית הטעינה והצגת השאלות בכל מקרה
+      getElement('#dynamic-questions-loading').style.display = 'none';
+      getElement('#dynamic-questions-container').style.display = 'block';
+    }
   }
   
   

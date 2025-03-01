@@ -264,6 +264,70 @@ app.post('/api/dynamic-questions', async (req, res) => {
   }
 });
 
+// 1. עדכן את server.js להוספת נקודת קצה לשאלות דינמיות
+// הוסף למודול שרת Express הקיים:
 
+app.post('/api/get-dynamic-questions', async (req, res) => {
+  try {
+    const { complaint, previousAnswers } = req.body;
+    
+    // לוג אירוע אבטחה
+    securityManager.logSecurityEvent({
+      eventType: "api_access",
+      endpoint: "/api/get-dynamic-questions",
+      timestamp: new Date().toISOString()
+    });
+    
+    // בניית פרומפט לשאלות המשך
+    const prompt = `
+      התלונה העיקרית של המטופל/ת: "${complaint}"
+      
+      התשובות הקודמות שניתנו הן:
+      ${JSON.stringify(previousAnswers, null, 2)}
+      
+      אנא צור/י 3 עד 5 שאלות המשך רפואיות נוספות, רלוונטיות וממוקדות,
+      בעברית. כתוב/י כל שאלה בשורה חדשה, ללא מספור וללא פרטים נוספים.
+    `.trim();
+    
+    // שליחת בקשה לשירות ה-LLM
+    const responseText = await llmService.sendPrompt(prompt);
+    
+    // פרסור התשובה לשאלות נפרדות
+    const lines = responseText.split('\n')
+      .map(line => line.trim())
+      .filter(Boolean)
+      .filter(line => line.endsWith('?'));
+    
+    // יצירת מערך שאלות במבנה הנדרש
+    const gptQuestions = lines.map(question => ({
+      type: 'multiline',
+      question: question
+    }));
+    
+    // קבלת שאלות מקומיות סטנדרטיות
+    const localQuestions = medicalDataSystem.getDynamicQuestions(complaint, previousAnswers);
+    
+    // שילוב השאלות המקומיות והשאלות מ-ChatGPT
+    const combinedQuestions = [...localQuestions, ...gptQuestions];
+    
+    res.json({ 
+      success: true, 
+      questions: combinedQuestions,
+      source: gptQuestions.length > 0 ? 'ai' : 'local'
+    });
+  } catch (error) {
+    console.error('שגיאה בקבלת שאלות מ-ChatGPT:', error);
+    
+    // במקרה של שגיאה, החזר רק שאלות מקומיות
+    const localQuestions = medicalDataSystem.getDynamicQuestions(complaint, previousAnswers);
+    
+    res.json({ 
+      success: true, 
+      questions: localQuestions,
+      source: 'local',
+      error: 'שימוש בשאלות מקומיות בשל שגיאה בקריאת API'
+    });
+  }
+});
 
 
