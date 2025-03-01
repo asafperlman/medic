@@ -9,7 +9,8 @@
 const config = require('../../config');
 const axios = require('axios');
 const CacheManager = require('../utils/cacheManager');
-
+// ייבוא Client של OpenAI
+const openaiClient = require('./openaiClient');
 // יצירת מנהל מטמון 
 const cache = new CacheManager({
   useDisk: true,
@@ -41,28 +42,15 @@ const LLMService = {
    * @returns {Promise<boolean>} - האם יש חיבור תקין
    */
   testApiConnection: async function() {
+    
     try {
-      console.log('בודק חיבור ל-OpenAI API...');
-      const response = await axios.get('https://api.openai.com/v1/models', {
-        headers: {
-          'Authorization': `Bearer ${this.config.apiKey}`
-        },
-        timeout: this.config.timeout
-      });
-      
-      if (response.status === 200) {
-        console.log('החיבור ל-OpenAI API תקין!');
-        return true;
-      } else {
-        console.error('בעיה בחיבור ל-OpenAI API:', response.status, response.statusText);
+        return await openaiClient.testConnection();
+      } catch (error) {
+        console.error('שגיאה בבדיקת חיבור:', error.message);
         return false;
       }
-    } catch (error) {
-      console.error('שגיאה בבדיקת חיבור ל-API:', error.message);
-      return false;
-    }
   },
-// הוסף פונקציות אלו בקובץ src/api/llmService.js
+
   /**
    * קבלת מודלים זמינים מ-OpenAI API
    * @returns {Promise<Array>} - רשימת המודלים הזמינים
@@ -107,7 +95,8 @@ const LLMService = {
       console.error('שגיאה בניקוי המטמון:', error.message);
       throw error;
     }
-  }
+  },
+
   /**
    * שליחת פרומפט למודל השפה
    * @param {string} prompt - הפרומפט לשליחה למודל
@@ -450,7 +439,7 @@ const LLMService = {
   },
 
   /**
-   * סימולציה של סיכום אנמנזה ממודל שפה (לסביבת פיתוח) - מעודכן לפורמט פרופיל
+   * סימולציה של סיכום אנמנזה ממודל שפה (לסביבת פיתוח) - מעודכנת לפורמט פרופיל
    * @private
    * @param {string} prompt - הפרומפט שנשלח
    * @returns {string} - סיכום מדומה
@@ -663,6 +652,9 @@ const LLMService = {
         summary += "לא ננקטו טיפולים משמעותיים עד כה.\n\n";
       }
     }
-  }}
+    
+    return summary;
+  }
+};
 
-  
+module.exports = LLMService;
