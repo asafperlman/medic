@@ -125,26 +125,63 @@ function createElement(tag, options = {}) {
  * @param {boolean} skipConfirm - האם לדלג על אישור שינויים
  */
 function showStep(stepNumber, skipConfirm = false) {
-  // בדיקת שינויים לא שמורים רק אם יש שינוי אמיתי בערכים
-  if (!skipConfirm && state.unsavedChanges && state.currentStep !== stepNumber) {
-    // לפני הצגת ההודעה, בדוק אם יש שינויים משמעותיים
-    const currentFormData = collectCurrentFormData();
-    const hasSignificantChanges = checkSignificantChanges(currentFormData);
-    
-    if (hasSignificantChanges) {
-      const confirmMove = confirm("יש לך שינויים שלא נשמרו. האם אתה בטוח שברצונך לעבור לשלב אחר?");
-      if (!confirmMove) {
-        return;
+    // בדיקת שינויים לא שמורים רק אם יש שינוי אמיתי בערכים
+    if (!skipConfirm && state.unsavedChanges && state.currentStep !== stepNumber) {
+      // לפני הצגת ההודעה, בדוק אם יש שינויים משמעותיים
+      const currentFormData = collectCurrentFormData();
+      const hasSignificantChanges = checkSignificantChanges(currentFormData);
+      
+      if (hasSignificantChanges) {
+        const confirmMove = confirm("יש לך שינויים שלא נשמרו. האם אתה בטוח שברצונך לעבור לשלב אחר?");
+        if (!confirmMove) {
+          return;
+        }
+      } else {
+        // אם אין שינויים משמעותיים, איפוס המצב ללא הודעה
+        state.unsavedChanges = false;
       }
-    } else {
-      // אם אין שינויים משמעותיים, איפוס המצב ללא הודעה
-      state.unsavedChanges = false;
     }
+  
+    // הסתרת כל השלבים
+    document.querySelectorAll('.step').forEach(step => {
+      step.classList.remove('active');
+    });
+  
+    // הצגת השלב הנבחר
+    const currentStepElement = document.getElementById(`step${stepNumber}`);
+    if (currentStepElement) {
+      currentStepElement.classList.add('active');
+    }
+  
+    // שמירת השלב הנוכחי
+    state.currentStep = stepNumber;
+  
+    // עדכון התצוגה
+    updateProgressBar();
+    updateButtonsVisibility();
   }
-
-  // שאר הקוד נשאר כפי שהוא...
-}
-
+/**
+ * בודק אם יש חיבור לשרת ומתאים את הממשק בהתאם
+ */
+function checkServerConnection() {
+    const apiStatus = document.getElementById('api-status');
+    
+    fetch('/api/test-openai-connection')
+      .then(response => response.json())
+      .then(data => {
+        if (data.success) {
+          apiStatus.className = 'api-status-indicator api-active';
+          apiStatus.innerHTML = '<i class="fas fa-signal"></i> שרת AI מחובר';
+        } else {
+          apiStatus.className = 'api-status-indicator api-inactive';
+          apiStatus.innerHTML = '<i class="fas fa-exclamation"></i> שרת AI לא זמין';
+        }
+      })
+      .catch(() => {
+        apiStatus.className = 'api-status-indicator api-offline';
+        apiStatus.innerHTML = '<i class="fas fa-exclamation-triangle"></i> מצב לא מקוון';
+      });
+  }
 /**
  * אוסף את המידע הנוכחי מהטופס
  * @returns {object} - המידע הנוכחי מהטופס
@@ -1424,6 +1461,47 @@ function getRelevantVitalSigns(complaint) {
  * @param {Array} relevantVitalSigns - מערך מדדים רלוונטיים 
  * @returns {HTMLElement} - טופס מדדים
  */
+
+/**
+ * עדכון מאפייני קלט של מדדים חיוניים
+ */
+function updateVitalSignInputAttributes() {
+    // קבלת כל שדות המדדים החיוניים
+    const vitalInputs = document.querySelectorAll('.vital-sign-input');
+    
+    // עדכון כל שדה לפי סוג המדד
+    vitalInputs.forEach(input => {
+      const vitalSign = input.dataset.vitalSign;
+      
+      switch (vitalSign) {
+        case 'pulse':
+          input.min = '40';
+          input.max = '200';
+          input.placeholder = 'פעימות לדקה (60-100)';
+          break;
+        case 'bloodPressure':
+          input.pattern = '[0-9]{2,3}/[0-9]{2,3}';
+          input.placeholder = 'לדוגמה: 120/80';
+          break;
+        case 'temperature':
+          input.min = '35';
+          input.max = '43';
+          input.step = '0.1';
+          input.placeholder = 'טמפרטורה (36-38°C)';
+          break;
+        case 'saturation':
+          input.min = '70';
+          input.max = '100';
+          input.placeholder = 'אחוז חמצן (94-100%)';
+          break;
+        case 'respiratoryRate':
+          input.min = '8';
+          input.max = '40';
+          input.placeholder = 'נשימות לדקה (12-20)';
+          break;
+      }
+    });
+  }
 function createVitalSignsForm(relevantVitalSigns) {
     const container = createElement('div', {
         className: 'vital-signs-container fade-in'
@@ -2178,6 +2256,29 @@ async function getAITreatmentRecommendations(patientRecord) {
         patientRecord
       );
     }
+  }
+
+/**
+ * יוצר אינדיקטור לסטטוס ה-API
+ * @returns {HTMLElement} - אינדיקטור הסטטוס
+ */
+function createApiStatusIndicator() {
+    const indicator = document.createElement('div');
+    indicator.className = 'api-status-indicator';
+    indicator.id = 'api-status';
+    
+    // בדיקת חיבור אינטרנט
+    const isOnline = navigator.onLine;
+    
+    if (isOnline) {
+      indicator.classList.add('api-active');
+      indicator.innerHTML = '<i class="fas fa-signal"></i> מערכת מקוונת';
+    } else {
+      indicator.classList.add('api-offline');
+      indicator.innerHTML = '<i class="fas fa-exclamation-triangle"></i> מצב לא מקוון';
+    }
+    
+    return indicator;
   }
 function initializeApplication() {
     // הוספת אינדיקטור מצב API

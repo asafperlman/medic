@@ -4,16 +4,26 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>מערכת איסוף נתונים רפואיים</title>
+    
+    <!-- ספריות CSS חיצוניות -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/noUiSlider/15.7.1/nouislider.min.css">
+    
+    <!-- קישור לקבצי CSS מקומיים -->
     <link rel="stylesheet" href="styles.css">
     <link rel="stylesheet" href="styles-dark.css">
-    <!-- Font Awesome לאייקונים -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+    
+    <!-- ספריות JavaScript חיצוניות -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/noUiSlider/15.7.1/nouislider.min.js" defer></script>
+    
     <!-- קישור לקבצי JavaScript -->
     <script src="components/formComponents.js" defer></script>
     <script src="utils/offlineManager.js" defer></script>
+    <script src="app.js" defer></script>
 </head>
 <body>
-    <div class="container">
+    <div class="container animate__animated animate__fadeIn">
         <header>
             <h1>מערכת איסוף נתונים רפואיים</h1>
             <p>מערכת לאיסוף מידע רפואי מהמטופל והעברתו לרופא/ה</p>
@@ -23,24 +33,29 @@
         <!-- סרגל התקדמות יתווסף כאן דינמית -->
 
         <!-- שלב 1: הזנת מידע בסיסי -->
-        <div id="step1" class="step active">
+        <div id="step1" class="step active animate__animated animate__fadeIn">
             <h2>שלב 1: מידע בסיסי על המטופל</h2>
             <!-- מידע פרופיל רפואי -->
             <div class="form-group">
                 <label>פרופיל רפואי:</label>
-                <div class="radio-group">
-                    <label class="radio-option">
-                        <input type="radio" name="profile" value="97" checked> 97
-                    </label>
-                    <label class="radio-option">
-                        <input type="radio" name="profile" value="82"> 82
-                    </label>
-                    <label class="radio-option">
-                        <input type="radio" name="profile" value="64"> 64
-                    </label>
-                    <label class="radio-option">
-                        <input type="radio" name="profile" value="21"> 21
-                    </label>
+                <div class="profile-cards">
+                    <div class="profile-card" data-value="97">
+                        <div class="profile-icon">97</div>
+                        <div class="profile-desc">בריא לחלוטין</div>
+                    </div>
+                    <div class="profile-card" data-value="82">
+                        <div class="profile-icon">82</div>
+                        <div class="profile-desc">בריא ברובו</div>
+                    </div>
+                    <div class="profile-card" data-value="64">
+                        <div class="profile-icon">64</div>
+                        <div class="profile-desc">מחלה כרונית קלה</div>
+                    </div>
+                    <div class="profile-card" data-value="21">
+                        <div class="profile-icon">21</div>
+                        <div class="profile-desc">מחלה כרונית משמעותית</div>
+                    </div>
+                    <input type="hidden" name="profile" id="profile-value" value="97">
                 </div>
             </div>
             <!-- סעיפים רפואיים -->
@@ -51,45 +66,51 @@
             <!-- אלרגיות -->
             <div class="form-group">
                 <label>אלרגיות:</label>
-                <div class="radio-group">
+                <div class="radio-group modern">
                     <label class="radio-option">
                         <input type="radio" name="allergies" value="no" checked onclick="toggleFieldVisibility('allergies', false)"> ללא אלרגיות ידועות
+                        <span class="checkmark"></span>
                     </label>
                     <label class="radio-option">
                         <input type="radio" name="allergies" value="yes" onclick="toggleFieldVisibility('allergies', true)"> יש אלרגיות
+                        <span class="checkmark"></span>
                     </label>
                 </div>
-                <div id="allergies-details-container" style="display: none; margin-top: 10px;">
+                <div id="allergies-details-container" style="display: none;" class="details-container animate__animated animate__fadeIn">
                     <input type="text" id="allergies-details" placeholder="פרט אלרגיות...">
                 </div>
             </div>
             <!-- תרופות קבועות -->
             <div class="form-group">
                 <label>נוטל/ת תרופות באופן קבוע:</label>
-                <div class="radio-group">
+                <div class="radio-group modern">
                     <label class="radio-option">
                         <input type="radio" name="medications" value="no" checked onclick="toggleFieldVisibility('medications', false)"> לא
+                        <span class="checkmark"></span>
                     </label>
                     <label class="radio-option">
                         <input type="radio" name="medications" value="yes" onclick="toggleFieldVisibility('medications', true)"> כן
+                        <span class="checkmark"></span>
                     </label>
                 </div>
-                <div id="medications-details-container" style="display: none; margin-top: 10px;">
+                <div id="medications-details-container" style="display: none;" class="details-container animate__animated animate__fadeIn">
                     <input type="text" id="medications-details" placeholder="פרט תרופות...">
                 </div>
             </div>
             <!-- שדה עישון (חדש) -->
             <div class="form-group">
                 <label>האם את/ה מעשן/ת?</label>
-                <div class="radio-group">
+                <div class="radio-group modern">
                     <label class="radio-option">
                         <input type="radio" name="smoking" value="no" checked onclick="toggleFieldVisibility('smoking', false)"> לא
+                        <span class="checkmark"></span>
                     </label>
                     <label class="radio-option">
                         <input type="radio" name="smoking" value="yes" onclick="toggleFieldVisibility('smoking', true)"> כן
+                        <span class="checkmark"></span>
                     </label>
                 </div>
-                <div id="smoking-details-container" style="display: none; margin-top: 10px;">
+                <div id="smoking-details-container" style="display: none;" class="details-container animate__animated animate__fadeIn">
                     <input type="text" id="smoking-details" placeholder="כמה סיגריות ביום? כמה שנים?">
                 </div>
             </div>
@@ -101,13 +122,16 @@
             </div>
             <div class="form-group">
                 <label>מין:</label>
-                <div class="radio-group">
-                    <label class="radio-option">
-                        <input type="radio" name="gender" value="male" checked> זכר
-                    </label>
-                    <label class="radio-option">
-                        <input type="radio" name="gender" value="female"> נקבה
-                    </label>
+                <div class="gender-selector">
+                    <div class="gender-option" data-value="male">
+                        <i class="fas fa-male"></i>
+                        <span>זכר</span>
+                    </div>
+                    <div class="gender-option" data-value="female">
+                        <i class="fas fa-female"></i>
+                        <span>נקבה</span>
+                    </div>
+                    <input type="hidden" name="gender" id="gender-value" value="male">
                 </div>
             </div>
             <div class="form-group">
@@ -234,7 +258,7 @@
 
         <!-- שלב 5: אישור סיום (משודרג) -->
         <div id="step5" class="step">
-            <div class="completion-header">
+            <div class="completion-header animate__animated animate__bounceIn">
                 <i class="fas fa-check-circle completion-icon"></i>
                 <h2>התהליך הושלם בהצלחה</h2>
                 <p>הסיכום זמין להעתקה ולשימוש</p>
@@ -259,121 +283,5 @@
             </div>
         </div>
     </div>
-
-    <!-- סגנונות נוספים משלימים -->
-    <style>
-        .completion-header {
-            text-align: center;
-            margin-bottom: 30px;
-        }
-        
-        .completion-icon {
-            font-size: 60px;
-            color: #4CAF50;
-            margin-bottom: 15px;
-        }
-        
-        .completion-actions {
-            display: flex;
-            gap: 15px;
-            margin-top: 30px;
-            justify-content: center;
-        }
-        
-        .additional-info-box {
-            background-color: #f5f9ff;
-            border: 1px solid #d0e3ff;
-            border-radius: 12px;
-            padding: 20px;
-            margin: 25px 0;
-        }
-        
-        .additional-info-box h3 {
-            color: #0056b3;
-            margin-top: 0;
-            margin-bottom: 15px;
-        }
-        
-        .additional-info-box ul {
-            padding-right: 20px;
-        }
-        
-        .additional-info-box li {
-            margin-bottom: 8px;
-        }
-        
-        .email-input-group {
-            position: relative;
-            margin-bottom: 15px;
-        }
-        
-        .input-icon {
-            position: absolute;
-            right: 12px;
-            top: 50%;
-            transform: translateY(-50%);
-            color: #666;
-        }
-        
-        .email-input-group input {
-            padding-right: 40px;
-        }
-        
-        .final-summary {
-            margin-top: 0;
-            background-color: #f8fbff;
-        }
-        
-        #print-summary {
-            background-color: #f8f9fa;
-            color: #333;
-            border: 1px solid #ddd;
-        }
-        
-        #print-summary:hover {
-            background-color: #e9ecef;
-        }
-        
-        [data-theme="dark"] .completion-icon {
-            color: #81c784;
-        }
-        
-        [data-theme="dark"] .additional-info-box {
-            background-color: #2c3e50;
-            border-color: #4b6584;
-            color: #ecf0f1;
-        }
-        
-        [data-theme="dark"] .input-icon {
-            color: #aaa;
-        }
-        
-        [data-theme="dark"] #print-summary {
-            background-color: #34495e;
-            color: #ecf0f1;
-            border-color: #4b6584;
-        }
-        
-        [data-theme="dark"] #print-summary:hover {
-            background-color: #3a4b5d;
-        }
-        
-        [data-theme="dark"] .final-summary {
-            background-color: #2c3e50;
-        }
-    </style>
-
-    <script>
-        // פונקציות עזר לטופס
-        function toggleFieldVisibility(fieldName, show) {
-            const detailsContainer = document.getElementById(`${fieldName}-details-container`);
-            detailsContainer.style.display = show ? 'block' : 'none';
-            
-            if (!show) {
-                document.getElementById(`${fieldName}-details`).value = '';
-            }
-        }
-    </script>
-    <script src="app.js"></script>
 </body>
 </html>
