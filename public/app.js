@@ -975,6 +975,314 @@ function createDetailedMedicalSummary(patientRecord) {
         return `פרופיל ${profile}, ${medicalSections || "ללא סעיפים"}, ${allergies || "ללא אלרגיות ידועות"}, ${medications || "לא נוטל/ת תרופות באופן קבוע"}.\n\nמטופל/ת בן/בת ${age}, ${genderText}, ${smoking === 'yes' ? 'מעשן/ת' : 'לא מעשן/ת'}, פונה עם תלונה עיקרית של ${mainComplaint}.\n\nלא ניתן היה להפיק סיכום מפורט בשל בעיה טכנית.`;
     }
 }
+// קוד להוספה לקובץ app.js - סעיף מיקום פציעה מתקדם
+
+// פונקציה ליצירת בורר מיקום פציעה מתקדם - להוספה בסיום קובץ app.js
+function createAdvancedInjuryLocationSelector() {
+    const container = document.createElement('div');
+    container.className = 'injury-location-container fade-in';
+    
+    const title = document.createElement('h3');
+    title.textContent = 'מיקום הפציעה';
+    container.appendChild(title);
+    
+    // יצירת אזור לבחירת מיקום הפציעה עם תמונה אינטראקטיבית
+    const bodyMapContainer = document.createElement('div');
+    bodyMapContainer.className = 'body-map-container';
+    
+    // כפתורים לבחירת צד קדמי/אחורי
+    const viewToggle = document.createElement('div');
+    viewToggle.className = 'body-view-toggle';
+    
+    const frontButton = document.createElement('button');
+    frontButton.type = 'button';
+    frontButton.className = 'view-toggle-btn active';
+    frontButton.textContent = 'מבט קדמי';
+    frontButton.dataset.view = 'front';
+    
+    const backButton = document.createElement('button');
+    backButton.type = 'button';
+    backButton.className = 'view-toggle-btn';
+    backButton.textContent = 'מבט אחורי';
+    backButton.dataset.view = 'back';
+    
+    frontButton.addEventListener('click', function() {
+        // הפעלת המבט הקדמי
+        this.classList.add('active');
+        backButton.classList.remove('active');
+        document.getElementById('body-map-front').style.display = 'block';
+        document.getElementById('body-map-back').style.display = 'none';
+    });
+    
+    backButton.addEventListener('click', function() {
+        // הפעלת המבט האחורי
+        this.classList.add('active');
+        frontButton.classList.remove('active');
+        document.getElementById('body-map-front').style.display = 'none';
+        document.getElementById('body-map-back').style.display = 'block';
+    });
+    
+    viewToggle.appendChild(frontButton);
+    viewToggle.appendChild(backButton);
+    bodyMapContainer.appendChild(viewToggle);
+    
+    // יצירת מפת גוף קדמית
+    const frontMap = document.createElement('div');
+    frontMap.id = 'body-map-front';
+    frontMap.className = 'body-map';
+    
+    const bodyPartsFront = [
+        { id: 'head', name: 'ראש', coords: '50,15,65,35', shape: 'circle' },
+        { id: 'chest', name: 'חזה', coords: '50,70,30', shape: 'circle' },
+        { id: 'abdomen', name: 'בטן', coords: '50,120,30', shape: 'circle' },
+        { id: 'right-arm', name: 'זרוע ימין', coords: '25,70,15', shape: 'circle' },
+        { id: 'left-arm', name: 'זרוע שמאל', coords: '75,70,15', shape: 'circle' },
+        { id: 'right-hand', name: 'כף יד ימין', coords: '15,100,10', shape: 'circle' },
+        { id: 'left-hand', name: 'כף יד שמאל', coords: '85,100,10', shape: 'circle' },
+        { id: 'right-leg', name: 'רגל ימין', coords: '40,180,20', shape: 'circle' },
+        { id: 'left-leg', name: 'רגל שמאל', coords: '60,180,20', shape: 'circle' },
+        { id: 'right-foot', name: 'כף רגל ימין', coords: '40,240,15', shape: 'circle' },
+        { id: 'left-foot', name: 'כף רגל שמאל', coords: '60,240,15', shape: 'circle' }
+    ];
+    
+    const frontImg = document.createElement('img');
+    frontImg.src = 'assets/body-front.svg';
+    frontImg.alt = 'מבט קדמי של הגוף';
+    frontImg.useMap = '#body-map-front';
+    
+    const frontImageMap = document.createElement('map');
+    frontImageMap.name = 'body-map-front';
+    
+    // יצירת אזורים לחיצים במפה הקדמית
+    bodyPartsFront.forEach(part => {
+        const area = document.createElement('area');
+        area.shape = part.shape;
+        area.coords = part.coords;
+        area.alt = part.name;
+        area.title = part.name;
+        area.href = 'javascript:void(0)';
+        
+        area.addEventListener('click', function(e) {
+            e.preventDefault();
+            selectBodyPart(part.id, part.name, 'front');
+        });
+        
+        frontImageMap.appendChild(area);
+    });
+    
+    frontMap.appendChild(frontImg);
+    frontMap.appendChild(frontImageMap);
+    bodyMapContainer.appendChild(frontMap);
+    
+    // יצירת מפת גוף אחורית
+    const backMap = document.createElement('div');
+    backMap.id = 'body-map-back';
+    backMap.className = 'body-map';
+    backMap.style.display = 'none';
+    
+    const bodyPartsBack = [
+        { id: 'back-head', name: 'חלק אחורי של הראש', coords: '50,15,65,35', shape: 'circle' },
+        { id: 'upper-back', name: 'גב עליון', coords: '50,70,30', shape: 'circle' },
+        { id: 'lower-back', name: 'גב תחתון', coords: '50,120,30', shape: 'circle' },
+        { id: 'right-shoulder', name: 'כתף ימין', coords: '35,55,10', shape: 'circle' },
+        { id: 'left-shoulder', name: 'כתף שמאל', coords: '65,55,10', shape: 'circle' },
+        { id: 'right-arm-back', name: 'זרוע ימין אחורית', coords: '25,70,15', shape: 'circle' },
+        { id: 'left-arm-back', name: 'זרוע שמאל אחורית', coords: '75,70,15', shape: 'circle' },
+        { id: 'right-leg-back', name: 'רגל ימין אחורית', coords: '40,180,20', shape: 'circle' },
+        { id: 'left-leg-back', name: 'רגל שמאל אחורית', coords: '60,180,20', shape: 'circle' }
+    ];
+    
+    const backImg = document.createElement('img');
+    backImg.src = 'assets/body-back.svg';
+    backImg.alt = 'מבט אחורי של הגוף';
+    backImg.useMap = '#body-map-back';
+    
+    const backImageMap = document.createElement('map');
+    backImageMap.name = 'body-map-back';
+    
+    // יצירת אזורים לחיצים במפה האחורית
+    bodyPartsBack.forEach(part => {
+        const area = document.createElement('area');
+        area.shape = part.shape;
+        area.coords = part.coords;
+        area.alt = part.name;
+        area.title = part.name;
+        area.href = 'javascript:void(0)';
+        
+        area.addEventListener('click', function(e) {
+            e.preventDefault();
+            selectBodyPart(part.id, part.name, 'back');
+        });
+        
+        backImageMap.appendChild(area);
+    });
+    
+    backMap.appendChild(backImg);
+    backMap.appendChild(backImageMap);
+    bodyMapContainer.appendChild(backMap);
+    
+    container.appendChild(bodyMapContainer);
+    
+    // אזור להצגת החלקים שנבחרו
+    const selectedPartsContainer = document.createElement('div');
+    selectedPartsContainer.className = 'selected-parts-container';
+    selectedPartsContainer.innerHTML = '<h4>אזורי פציעה שנבחרו:</h4>';
+    
+    const selectedPartsList = document.createElement('ul');
+    selectedPartsList.id = 'selected-body-parts';
+    selectedPartsContainer.appendChild(selectedPartsList);
+    
+    // שדה מוסתר לשמירת הערך הסופי
+    const hiddenInput = document.createElement('input');
+    hiddenInput.type = 'hidden';
+    hiddenInput.id = 'injury-location-value';
+    hiddenInput.name = 'injury-location';
+    selectedPartsContainer.appendChild(hiddenInput);
+    
+    container.appendChild(selectedPartsContainer);
+    
+    // אפשרות להוספת פרטים ספציפיים יותר
+    const specificDetailsContainer = document.createElement('div');
+    specificDetailsContainer.className = 'specific-details-container';
+    
+    const specificDetailsTitle = document.createElement('h4');
+    specificDetailsTitle.textContent = 'פרטים ספציפיים נוספים על הפציעה:';
+    specificDetailsContainer.appendChild(specificDetailsTitle);
+    
+    const specificDetailsInput = document.createElement('textarea');
+    specificDetailsInput.id = 'injury-specific-details';
+    specificDetailsInput.className = 'specific-details-input';
+    specificDetailsInput.placeholder = 'הזן פרטים נוספים על הפציעה (לדוגמה: פציעת שריר ביד ימין, כאב בקרסול שמאל, וכו\')';
+    specificDetailsInput.rows = 3;
+    
+    specificDetailsInput.addEventListener('input', function() {
+        updateInjuryLocation();
+        state.unsavedChanges = true;
+    });
+    
+    specificDetailsContainer.appendChild(specificDetailsInput);
+    container.appendChild(specificDetailsContainer);
+    
+    return container;
+}
+
+// פונקציה לבחירת חלק גוף על המפה
+function selectBodyPart(partId, partName, view) {
+    // בדיקה אם החלק כבר נבחר
+    const existingItem = document.querySelector(`#selected-body-parts li[data-part-id="${partId}"]`);
+    if (existingItem) {
+        // הסרת החלק אם כבר נבחר
+        existingItem.remove();
+    } else {
+        // הוספת החלק לרשימת הנבחרים
+        const listItem = document.createElement('li');
+        listItem.textContent = partName;
+        listItem.dataset.partId = partId;
+        listItem.dataset.partName = partName;
+        listItem.dataset.partView = view;
+        
+        // יצירת כפתור הסרה
+        const removeButton = document.createElement('button');
+        removeButton.type = 'button';
+        removeButton.className = 'remove-part-btn';
+        removeButton.innerHTML = '&times;';
+        removeButton.title = 'הסר מהרשימה';
+        
+        removeButton.addEventListener('click', function() {
+            listItem.remove();
+            updateInjuryLocation();
+            state.unsavedChanges = true;
+        });
+        
+        listItem.appendChild(removeButton);
+        document.getElementById('selected-body-parts').appendChild(listItem);
+    }
+    
+    // עדכון השדה הסופי
+    updateInjuryLocation();
+    state.unsavedChanges = true;
+}
+
+// פונקציה לעדכון ערך מיקום הפציעה הסופי
+function updateInjuryLocation() {
+    const selectedParts = [];
+    
+    // איסוף החלקים שנבחרו
+    document.querySelectorAll('#selected-body-parts li').forEach(item => {
+        selectedParts.push(item.dataset.partName);
+    });
+    
+    // הוספת פרטים ספציפיים אם קיימים
+    const specificDetails = document.getElementById('injury-specific-details').value.trim();
+    
+    let finalValue = selectedParts.join(', ');
+    if (specificDetails) {
+        finalValue += specificDetails ? (finalValue ? '; ' : '') + specificDetails : '';
+    }
+    
+    // עדכון השדה הסופי
+    document.getElementById('injury-location-value').value = finalValue;
+    
+    return finalValue;
+}
+
+// פונקציה ליצירת שאלות ספציפיות לפציעות ספורט
+function createSportsInjuryQuestions() {
+    const questions = [
+        {
+            type: "mechanism",
+            question: "כיצד אירעה הפציעה?",
+            options: ["במהלך ריצה", "במהלך קפיצה", "עצירה פתאומית", "מכה/מגע", "תנועה מסתובבת", "מתיחה יתרה", "אחר"]
+        },
+        {
+            type: "duration",
+            question: "מתי אירעה הפציעה?",
+            placeholder: "לדוגמה: לפני שעתיים, אתמול בערב, לפני שבוע..."
+        },
+        {
+            type: "characteristic",
+            question: "מהו אופי הכאב?",
+            options: ["חד", "מתמשך", "פועם", "שורף", "דוקר", "עמום"]
+        },
+        {
+            type: "scale",
+            question: "מהי עוצמת הכאב בסולם 1-10?",
+            placeholder: "דרג מ-1 (קל) עד 10 (חמור ביותר)"
+        },
+        {
+            type: "yesNo",
+            question: "האם יש נפיחות באזור הפציעה?",
+            followUp: "תאר את מידת הנפיחות"
+        },
+        {
+            type: "yesNo",
+            question: "האם יש שינוי צבע (כחול/אדום) באזור הפציעה?",
+            followUp: "תאר את שינוי הצבע"
+        },
+        {
+            type: "yesNo",
+            question: "האם יש הגבלה בטווח התנועה?",
+            followUp: "תאר את המגבלה (לדוגמה: לא יכול להרים יד מעל הראש)"
+        },
+        {
+            type: "yesNo",
+            question: "האם יש תחושת חוסר יציבות או רפיון באזור הפציעה?",
+            followUp: "תאר את התחושה"
+        },
+        {
+            type: "multiline",
+            question: "תאר את הפעילות שבמהלכה נפצעת (סוג הספורט, עוצמה, משך)",
+            placeholder: "לדוגמה: משחק כדורגל תחרותי, אימון אישי בחדר כושר..."
+        },
+        {
+            type: "yesNo",
+            question: "האם טיפלת בפציעה באופן כלשהו עד כה?",
+            followUp: "פרט איזה טיפול ננקט (קרח, חבישה, תרופות)"
+        }
+    ];
+    
+    return questions;
+}
 // ---------- יוזמות אתחול הדף ----------
 
 document.addEventListener('DOMContentLoaded', function() {
