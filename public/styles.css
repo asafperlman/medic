@@ -485,3 +485,476 @@ button:hover {
     from { transform: translateY(20px); opacity: 0; }
     to { transform: translateY(0); opacity: 1; }
 }
+/* הוספת סגנונות חדשים לקובץ public/styles.css */
+
+/* סגנונות לאזור חיפוש התלונות העיקריות */
+.search-container {
+    position: relative;
+    margin-bottom: 12px;
+    width: 100%;
+    max-width: 100%;
+}
+
+.complaint-search {
+    width: 100%;
+    padding: 12px 40px 12px 12px;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    font-size: 16px;
+    transition: all 0.3s ease;
+    background-color: #f9f9f9;
+}
+
+.complaint-search:focus {
+    border-color: #4d94ff;
+    box-shadow: 0 0 0 3px rgba(77, 148, 255, 0.2);
+    outline: none;
+    background-color: white;
+}
+
+.search-icon {
+    position: absolute;
+    right: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #888;
+    z-index: 1;
+}
+
+/* סגנונות לכפתורי גיל מהירים */
+.quick-age-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 8px;
+}
+
+.age-button {
+    padding: 6px 12px;
+    border: 1px solid #ddd;
+    border-radius: 20px;
+    background-color: #f0f7ff;
+    color: #0056b3;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.age-button:hover {
+    background-color: #d0e3ff;
+    transform: translateY(-2px);
+}
+
+/* סגנון לשאלות בעלות תצוגה משופרת */
+.question-item {
+    transition: all 0.3s ease;
+    border-radius: 12px;
+    margin-bottom: 20px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    overflow: hidden;
+}
+
+.question-header {
+    font-weight: 600;
+    padding: 15px;
+    background-color: #f5f9ff;
+    border-bottom: 1px solid #e0e7f2;
+    color: #2c3e50;
+}
+
+.answer-container {
+    padding: 15px;
+    background-color: white;
+}
+
+/* רדיו בוטונים משופרים */
+.question-radio-group {
+    display: flex;
+    gap: 15px;
+    margin-bottom: 10px;
+}
+
+.radio-option {
+    position: relative;
+    display: flex;
+    align-items: center;
+    padding: 8px 16px;
+    background-color: #f9f9f9;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border: 1px solid transparent;
+}
+
+.radio-option:hover {
+    background-color: #f0f0f0;
+}
+
+.radio-yes.selected, .radio-option input[type="radio"]:checked + .radio-yes {
+    background-color: #e3f1e3;
+    border-color: #4CAF50;
+    color: #2e7d32;
+}
+
+.radio-no.selected, .radio-option input[type="radio"]:checked + .radio-no {
+    background-color: #fdecea;
+    border-color: #f44336;
+    color: #c62828;
+}
+
+.radio-option input[type="radio"] {
+    margin-right: 8px;
+}
+
+.follow-up-container {
+    margin-top: 12px;
+    padding-right: 15px;
+    border-right: 3px solid #4d94ff;
+    animation: fadeIn 0.3s;
+}
+
+.follow-up-input {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    font-size: 14px;
+}
+
+/* סגנונות לסקאלות */
+.scale-container {
+    margin-top: 10px;
+}
+
+.scale-label {
+    margin-bottom: 8px;
+    font-size: 14px;
+    color: #666;
+}
+
+.scale-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.scale-button {
+    width: 40px;
+    height: 40px;
+    border: 1px solid #ddd;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    background-color: white;
+    transition: all 0.2s ease;
+}
+
+.scale-button:hover {
+    background-color: #f0f7ff;
+    border-color: #4d94ff;
+}
+
+.scale-button.selected {
+    background-color: #4d94ff;
+    color: white;
+    border-color: #0056b3;
+    font-weight: bold;
+}
+
+/* סגנונות לתיבת הסיכום */
+.summary-box {
+    background-color: #f0f7ff;
+    border: 1px solid #d0e3ff;
+    border-radius: 12px;
+    padding: 25px;
+    margin: 25px 0;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+}
+
+.summary-box h3 {
+    color: #0056b3;
+    margin-top: 0;
+    margin-bottom: 20px;
+    padding-bottom: 15px;
+    border-bottom: 2px solid #d0e3ff;
+    font-size: 20px;
+}
+
+#summary-text, #final-summary-text {
+    font-size: 16px;
+    line-height: 1.7;
+    white-space: pre-line;
+    color: #333;
+}
+
+#summary-text p, #final-summary-text p {
+    margin-bottom: 15px;
+}
+
+/* דגלים אדומים משופרים */
+.red-flag {
+    background-color: rgba(244, 67, 54, 0.08);
+    border-right: 4px solid #f44336;
+    padding: 15px;
+    margin: 20px 0;
+    border-radius: 8px;
+    display: flex;
+    align-items: flex-start;
+    animation: pulse 2s infinite;
+}
+
+.red-flag i {
+    color: #f44336;
+    font-size: 20px;
+    margin-left: 15px;
+    animation: shake 0.5s;
+}
+
+.red-flag-content {
+    flex-grow: 1;
+    color: #b71c1c;
+    font-weight: 500;
+}
+
+@keyframes pulse {
+    0% { box-shadow: 0 0 0 0 rgba(244, 67, 54, 0.2); }
+    70% { box-shadow: 0 0 0 10px rgba(244, 67, 54, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(244, 67, 54, 0); }
+}
+
+@keyframes shake {
+    0% { transform: translateX(0); }
+    25% { transform: translateX(-5px); }
+    50% { transform: translateX(5px); }
+    75% { transform: translateX(-5px); }
+    100% { transform: translateX(0); }
+}
+
+/* סגנונות למדדים חיוניים */
+.vital-signs-container {
+    background-color: #f5f9ff;
+    border-radius: 12px;
+    padding: 20px;
+    margin: 25px 0;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+.vital-signs-container h3 {
+    color: #0056b3;
+    margin-top: 0;
+    margin-bottom: 15px;
+    font-size: 18px;
+}
+
+.vital-signs-form {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 15px;
+}
+
+.vital-sign-group {
+    margin-bottom: 0;
+}
+
+.vital-sign-input {
+    padding: 10px;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    transition: all 0.3s ease;
+}
+
+.vital-sign-input:focus {
+    border-color: #4d94ff;
+    box-shadow: 0 0 0 3px rgba(77, 148, 255, 0.1);
+    outline: none;
+}
+
+/* הודעות טוסט */
+.toast-notification {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    padding: 15px 25px;
+    border-radius: 8px;
+    color: white;
+    font-weight: 500;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    z-index: 1000;
+    animation: slideIn 0.3s, fadeOut 0.3s 2.7s;
+}
+
+.toast-notification.success {
+    background-color: #4CAF50;
+}
+
+.toast-notification.info {
+    background-color: #2196F3;
+}
+
+.toast-notification.warning {
+    background-color: #FF9800;
+}
+
+.toast-notification.error {
+    background-color: #F44336;
+}
+
+.toast-notification.sending {
+    background-color: #673AB7;
+}
+
+.toast-notification i {
+    margin-left: 10px;
+}
+
+@keyframes slideIn {
+    from { transform: translateY(100px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+}
+
+@keyframes fadeOut {
+    from { opacity: 1; }
+    to { opacity: 0; }
+}
+
+/* שיפורים ותאימות למסכים קטנים */
+@media (max-width: 768px) {
+    .vital-signs-form {
+        grid-template-columns: 1fr;
+    }
+    
+    .quick-age-buttons {
+        justify-content: center;
+    }
+    
+    .search-container {
+        margin-bottom: 15px;
+    }
+    
+    .question-radio-group {
+        flex-direction: column;
+        gap: 10px;
+    }
+    
+    .radio-option {
+        width: 100%;
+    }
+}
+
+/* סגנונות למצב כהה */
+[data-theme="dark"] .complaint-search {
+    background-color: #333;
+    border-color: #555;
+    color: #eee;
+}
+
+[data-theme="dark"] .complaint-search:focus {
+    background-color: #444;
+}
+
+[data-theme="dark"] .search-icon {
+    color: #aaa;
+}
+
+[data-theme="dark"] .age-button {
+    background-color: #2a3b4d;
+    color: #90caf9;
+    border-color: #555;
+}
+
+[data-theme="dark"] .age-button:hover {
+    background-color: #3a4b5d;
+}
+
+[data-theme="dark"] .question-header {
+    background-color: #2c3e50;
+    border-color: #404e5c;
+    color: #ecf0f1;
+}
+
+[data-theme="dark"] .answer-container {
+    background-color: #34495e;
+}
+
+[data-theme="dark"] .radio-option {
+    background-color: #2c3e50;
+    color: #ecf0f1;
+}
+
+[data-theme="dark"] .radio-option:hover {
+    background-color: #3a4b5d;
+}
+
+[data-theme="dark"] .radio-yes.selected, 
+[data-theme="dark"] .radio-option input[type="radio"]:checked + .radio-yes {
+    background-color: #2e7d32;
+    color: #e8f5e9;
+}
+
+[data-theme="dark"] .radio-no.selected, 
+[data-theme="dark"] .radio-option input[type="radio"]:checked + .radio-no {
+    background-color: #c62828;
+    color: #ffebee;
+}
+
+[data-theme="dark"] .follow-up-container {
+    border-right-color: #90caf9;
+}
+
+[data-theme="dark"] .follow-up-input {
+    background-color: #2c3e50;
+    border-color: #4b6584;
+    color: #ecf0f1;
+}
+
+[data-theme="dark"] .scale-button {
+    background-color: #2c3e50;
+    border-color: #4b6584;
+    color: #ecf0f1;
+}
+
+[data-theme="dark"] .scale-button:hover {
+    background-color: #3a4b5d;
+}
+
+[data-theme="dark"] .scale-button.selected {
+    background-color: #90caf9;
+    color: #2c3e50;
+    border-color: #2196f3;
+}
+
+[data-theme="dark"] .summary-box {
+    background-color: #2c3e50;
+    border-color: #4b6584;
+}
+
+[data-theme="dark"] .summary-box h3 {
+    color: #90caf9;
+    border-color: #4b6584;
+}
+
+[data-theme="dark"] #summary-text, 
+[data-theme="dark"] #final-summary-text {
+    color: #ecf0f1;
+}
+
+[data-theme="dark"] .red-flag {
+    background-color: rgba(244, 67, 54, 0.15);
+}
+
+[data-theme="dark"] .vital-signs-container {
+    background-color: #2c3e50;
+}
+
+[data-theme="dark"] .vital-sign-input {
+    background-color: #34495e;
+    border-color: #4b6584;
+    color: #ecf0f1;
+}
+
+[data-theme="dark"] .vital-sign-input:focus {
+    border-color: #90caf9;
+}

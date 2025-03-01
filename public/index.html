@@ -17,7 +17,10 @@
         <header>
             <h1>מערכת איסוף נתונים רפואיים</h1>
             <p>מערכת לאיסוף מידע רפואי מהמטופל והעברתו לרופא/ה</p>
+            <!-- כפתור מצב תצוגה יתווסף כאן דינמית -->
         </header>
+
+        <!-- סרגל התקדמות יתווסף כאן דינמית -->
 
         <!-- שלב 1: הזנת מידע בסיסי -->
         <div id="step1" class="step active">
@@ -50,10 +53,10 @@
                 <label>אלרגיות:</label>
                 <div class="radio-group">
                     <label class="radio-option">
-                        <input type="radio" name="allergies" value="no" checked onclick="toggleAllergiesField(false)"> ללא אלרגיות ידועות
+                        <input type="radio" name="allergies" value="no" checked onclick="toggleFieldVisibility('allergies', false)"> ללא אלרגיות ידועות
                     </label>
                     <label class="radio-option">
-                        <input type="radio" name="allergies" value="yes" onclick="toggleAllergiesField(true)"> יש אלרגיות
+                        <input type="radio" name="allergies" value="yes" onclick="toggleFieldVisibility('allergies', true)"> יש אלרגיות
                     </label>
                 </div>
                 <div id="allergies-details-container" style="display: none; margin-top: 10px;">
@@ -65,20 +68,36 @@
                 <label>נוטל/ת תרופות באופן קבוע:</label>
                 <div class="radio-group">
                     <label class="radio-option">
-                        <input type="radio" name="medications" value="no" checked onclick="toggleMedicationsField(false)"> לא
+                        <input type="radio" name="medications" value="no" checked onclick="toggleFieldVisibility('medications', false)"> לא
                     </label>
                     <label class="radio-option">
-                        <input type="radio" name="medications" value="yes" onclick="toggleMedicationsField(true)"> כן
+                        <input type="radio" name="medications" value="yes" onclick="toggleFieldVisibility('medications', true)"> כן
                     </label>
                 </div>
                 <div id="medications-details-container" style="display: none; margin-top: 10px;">
                     <input type="text" id="medications-details" placeholder="פרט תרופות...">
                 </div>
             </div>
+            <!-- שדה עישון (חדש) -->
+            <div class="form-group">
+                <label>האם את/ה מעשן/ת?</label>
+                <div class="radio-group">
+                    <label class="radio-option">
+                        <input type="radio" name="smoking" value="no" checked onclick="toggleFieldVisibility('smoking', false)"> לא
+                    </label>
+                    <label class="radio-option">
+                        <input type="radio" name="smoking" value="yes" onclick="toggleFieldVisibility('smoking', true)"> כן
+                    </label>
+                </div>
+                <div id="smoking-details-container" style="display: none; margin-top: 10px;">
+                    <input type="text" id="smoking-details" placeholder="כמה סיגריות ביום? כמה שנים?">
+                </div>
+            </div>
             <!-- מידע דמוגרפי -->
             <div class="form-group">
                 <label for="patient-age">גיל:</label>
                 <input type="number" id="patient-age" min="0" max="120" required>
+                <!-- כפתורי גיל מהירים יתווספו כאן דינמית -->
             </div>
             <div class="form-group">
                 <label>מין:</label>
@@ -93,6 +112,7 @@
             </div>
             <div class="form-group">
                 <label for="main-complaint">תלונה עיקרית:</label>
+                <!-- שדה חיפוש התלונות יתווסף כאן דינמית -->
                 <select id="main-complaint" required>
                     <option value="" disabled selected>בחר תלונה עיקרית</option>
                     <!-- אפשרויות יתווספו דינמית ע"י JavaScript -->
@@ -104,21 +124,33 @@
             </div>
             <div class="button-group">
                 <div></div> <!-- שומר מקום לכפתור "הקודם" שיופיע בשלבים הבאים -->
-                <button id="next-to-step2">המשך לשאלות</button>
+                <button id="next-to-step2" class="btn-primary">
+                    <i class="fas fa-arrow-left"></i> המשך לשאלות
+                </button>
             </div>
         </div>
 
         <!-- שלב 2: שאלות סטנדרטיות -->
         <div id="step2" class="step">
-            <h2>שלב 2: שאלות סטנדרטיות</h2>
+            <h2>שלב 2: שאלות לפי תלונה</h2>
             <div id="standard-questions-container">
                 <ul class="questions-list" id="standard-questions-list">
                     <!-- שאלות יתווספו דינמית ע"י JavaScript -->
                 </ul>
             </div>
+            
+            <!-- אזור מדדים חיוניים (חדש) -->
+            <div id="vital-signs-container" class="vital-signs-container">
+                <!-- כאן יתווספו שדות המדדים החיוניים דינמית -->
+            </div>
+            
             <div class="button-group">
-                <button id="back-to-step1" class="secondary">חזור</button>
-                <button id="next-to-step3">המשך לשאלות נוספות</button>
+                <button id="back-to-step1" class="btn-secondary">
+                    <i class="fas fa-arrow-right"></i> חזור
+                </button>
+                <button id="next-to-step3" class="btn-primary">
+                    <i class="fas fa-arrow-left"></i> המשך לשאלות נוספות
+                </button>
             </div>
         </div>
 
@@ -135,75 +167,210 @@
                 </ul>
             </div>
             <div class="button-group">
-                <button id="back-to-step2" class="secondary">חזור</button>
-                <button id="next-to-step4">יצירת סיכום</button>
+                <button id="back-to-step2" class="btn-secondary">
+                    <i class="fas fa-arrow-right"></i> חזור
+                </button>
+                <button id="next-to-step4" class="btn-primary">
+                    <i class="fas fa-file-medical-alt"></i> יצירת סיכום
+                </button>
             </div>
         </div>
 
-        <!-- שלב 4: סיכום ושליחה -->
+        <!-- שלב 4: סיכום ושליחה (משודרג) -->
         <div id="step4" class="step">
-            <h2>שלב 4: סיכום המידע</h2>
+            <h2>שלב 4: סיכום רפואי</h2>
             <div class="loading" id="summary-loading">
                 <div class="loading-spinner"></div>
                 <p>מייצר סיכום אנמנזה...</p>
             </div>
+            
             <div id="summary-container">
                 <div class="summary-box">
-                    <h3>סיכום אנמנזה</h3>
-                    <p id="summary-text"></p>
+                    <h3>סיכום אנמנזה רפואית</h3>
+                    <div id="summary-text"></div>
                     <!-- כפתור העתקה -->
                     <button id="copy-summary" class="copy-button">
                         <i class="fas fa-copy"></i> העתק סיכום
                     </button>
                 </div>
+                
+                <!-- מידע נוסף -->
+                <div class="additional-info-box">
+                    <h3>מה הלאה?</h3>
+                    <p>הסיכום הרפואי הופק בהצלחה. באפשרותך:</p>
+                    <ul>
+                        <li>להעתיק את הסיכום לשימוש מיידי</li>
+                        <li>לשלוח את הסיכום לרופא/ה באמצעות דוא"ל (אופציונלי)</li>
+                        <li>לחזור לשלבים קודמים לעדכון פרטים</li>
+                    </ul>
+                </div>
+                
                 <!-- כפתור לסיום בלי צורך בדוא"ל -->
                 <div class="form-group">
-                    <button id="complete-summary" class="btn-success">סיים וחזור להתחלה</button>
+                    <button id="complete-summary" class="btn-success">
+                        <i class="fas fa-check-circle"></i> סיים וחזור להתחלה
+                    </button>
                 </div>
                 
                 <!-- אופציונלי - שליחה לרופא -->
                 <div class="form-group optional-section">
                     <label for="doctor-email">כתובת דוא"ל של הרופא/ה (אופציונלי):</label>
-                    <input type="email" id="doctor-email">
+                    <div class="email-input-group">
+                        <i class="fas fa-envelope input-icon"></i>
+                        <input type="email" id="doctor-email" placeholder="הזן כתובת דוא"ל...">
+                    </div>
+                    <button id="send-summary" class="btn-primary">
+                        <i class="fas fa-paper-plane"></i> שלח סיכום
+                    </button>
                 </div>
             </div>
+            
             <div class="button-group">
-                <button id="back-to-step3" class="secondary">חזור</button>
-                <button id="send-summary">סיים או שלח לרופא/ה</button>
+                <button id="back-to-step3" class="btn-secondary">
+                    <i class="fas fa-arrow-right"></i> חזור
+                </button>
             </div>
         </div>
 
-        <!-- שלב 5: אישור סיום -->
+        <!-- שלב 5: אישור סיום (משודרג) -->
         <div id="step5" class="step">
-            <h2>התהליך הושלם בהצלחה</h2>
-            <p>הסיכום זמין להעתקה.</p>
-            <div class="summary-box">
-                <h3>הסיכום שהופק:</h3>
-                <p id="final-summary-text"></p>
+            <div class="completion-header">
+                <i class="fas fa-check-circle completion-icon"></i>
+                <h2>התהליך הושלם בהצלחה</h2>
+                <p>הסיכום זמין להעתקה ולשימוש</p>
+            </div>
+            
+            <div class="summary-box final-summary">
+                <h3>הסיכום הרפואי שהופק:</h3>
+                <div id="final-summary-text"></div>
                 <button id="copy-final-summary" class="copy-button">
                     <i class="fas fa-copy"></i> העתק סיכום
                 </button>
             </div>
-            <div class="button-group">
-                <div></div> <!-- שומר מקום -->
-                <button id="start-new" class="btn-primary">התחל רשומה חדשה</button>
+            
+            <div class="completion-actions">
+                <button id="start-new" class="btn-primary">
+                    <i class="fas fa-file"></i> התחל רשומה חדשה
+                </button>
+                
+                <button id="print-summary" class="btn-secondary">
+                    <i class="fas fa-print"></i> הדפס סיכום
+                </button>
             </div>
         </div>
     </div>
 
-    <script>
-        // פונקציות עזר לטופס
-        function toggleAllergiesField(show) {
-            document.getElementById('allergies-details-container').style.display = show ? 'block' : 'none';
-            if (!show) {
-                document.getElementById('allergies-details').value = '';
-            }
+    <!-- סגנונות נוספים משלימים -->
+    <style>
+        .completion-header {
+            text-align: center;
+            margin-bottom: 30px;
         }
         
-        function toggleMedicationsField(show) {
-            document.getElementById('medications-details-container').style.display = show ? 'block' : 'none';
+        .completion-icon {
+            font-size: 60px;
+            color: #4CAF50;
+            margin-bottom: 15px;
+        }
+        
+        .completion-actions {
+            display: flex;
+            gap: 15px;
+            margin-top: 30px;
+            justify-content: center;
+        }
+        
+        .additional-info-box {
+            background-color: #f5f9ff;
+            border: 1px solid #d0e3ff;
+            border-radius: 12px;
+            padding: 20px;
+            margin: 25px 0;
+        }
+        
+        .additional-info-box h3 {
+            color: #0056b3;
+            margin-top: 0;
+            margin-bottom: 15px;
+        }
+        
+        .additional-info-box ul {
+            padding-right: 20px;
+        }
+        
+        .additional-info-box li {
+            margin-bottom: 8px;
+        }
+        
+        .email-input-group {
+            position: relative;
+            margin-bottom: 15px;
+        }
+        
+        .input-icon {
+            position: absolute;
+            right: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #666;
+        }
+        
+        .email-input-group input {
+            padding-right: 40px;
+        }
+        
+        .final-summary {
+            margin-top: 0;
+            background-color: #f8fbff;
+        }
+        
+        #print-summary {
+            background-color: #f8f9fa;
+            color: #333;
+            border: 1px solid #ddd;
+        }
+        
+        #print-summary:hover {
+            background-color: #e9ecef;
+        }
+        
+        [data-theme="dark"] .completion-icon {
+            color: #81c784;
+        }
+        
+        [data-theme="dark"] .additional-info-box {
+            background-color: #2c3e50;
+            border-color: #4b6584;
+            color: #ecf0f1;
+        }
+        
+        [data-theme="dark"] .input-icon {
+            color: #aaa;
+        }
+        
+        [data-theme="dark"] #print-summary {
+            background-color: #34495e;
+            color: #ecf0f1;
+            border-color: #4b6584;
+        }
+        
+        [data-theme="dark"] #print-summary:hover {
+            background-color: #3a4b5d;
+        }
+        
+        [data-theme="dark"] .final-summary {
+            background-color: #2c3e50;
+        }
+    </style>
+
+    <script>
+        // פונקציות עזר לטופס
+        function toggleFieldVisibility(fieldName, show) {
+            const detailsContainer = document.getElementById(`${fieldName}-details-container`);
+            detailsContainer.style.display = show ? 'block' : 'none';
+            
             if (!show) {
-                document.getElementById('medications-details').value = '';
+                document.getElementById(`${fieldName}-details`).value = '';
             }
         }
     </script>

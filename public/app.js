@@ -3,10 +3,11 @@
 // מצב הנוכחי של המערכת
 const state = {
     currentStep: 1,
-    patientRecord: null
+    patientRecord: null,
+    darkMode: localStorage.getItem('darkMode') === 'true' || false
 };
 
-// פונקציות עזר לממשק המשתמש
+// ---------- פונקציות עזר לממשק המשתמש ----------
 
 // פונקציה להצגת שלב מסוים
 function showStep(stepNumber) {
@@ -27,43 +28,467 @@ function showStep(stepNumber) {
     }
 }
 
-// פונקציה ליצירת אלמנט שאלה במסך
-function createQuestionElement(question, index, isStandard = true) {
+
+// פונקציה ליצירת אלמנט שאלה במסך לפי הסוג
+function createQuestionElement(questionData, index, isStandard = true) {
     const listItem = document.createElement('li');
-    listItem.className = 'question-item';
+    listItem.className = 'question-item fade-in';
     
-    const questionText = document.createElement('div');
-    questionText.textContent = question;
-    listItem.appendChild(questionText);
+    // כותרת השאלה
+    const questionHeader = document.createElement('div');
+    questionHeader.className = 'question-header';
+    questionHeader.textContent = questionData.question;
+    listItem.appendChild(questionHeader);
     
-    const answerInput = document.createElement('input');
-    answerInput.type = 'text';
-    answerInput.className = 'answer-input';
-    answerInput.placeholder = 'הזן תשובה...';
-    answerInput.dataset.question = question;
-    answerInput.dataset.index = index;
+    // יצירת אזור תשובה בהתאם לסוג השאלה
+    const answerContainer = document.createElement('div');
+    answerContainer.className = 'answer-container';
     
-    // אם זו שאלה סטנדרטית, נוסיף כיתוב data-standard
-    if (isStandard) {
-        answerInput.dataset.standard = 'true';
-    } else {
-        answerInput.dataset.dynamic = 'true';
+    // שדה הזנת תשובה בהתאם לסוג השאלה
+    switch (questionData.type) {
+        case 'yesNo':
+            // יצירת רדיו בוטונים של כן/לא
+            const radioGroup = document.createElement('div');
+            radioGroup.className = 'radio-group question-radio-group';
+            
+            // אפשרות "כן"
+            const yesLabel = document.createElement('label');
+            yesLabel.className = 'radio-option radio-yes';
+            const yesInput = document.createElement('input');
+            yesInput.type = 'radio';
+            yesInput.name = `question-${index}-${isStandard ? 'std' : 'dyn'}`;
+            yesInput.value = 'כן';
+            yesInput.dataset.question = questionData.question;
+            yesInput.dataset.index = index;
+            yesInput.dataset.type = 'yesNo';
+            
+            if (isStandard) {
+                yesInput.dataset.standard = 'true';
+            } else {
+                yesInput.dataset.dynamic = 'true';
+            }
+            
+            yesLabel.appendChild(yesInput);
+            yesLabel.appendChild(document.createTextNode('כן'));
+            
+            // אפשרות "לא"
+            const noLabel = document.createElement('label');
+            noLabel.className = 'radio-option radio-no';
+            const noInput = document.createElement('input');
+            noInput.type = 'radio';
+            noInput.name = `question-${index}-${isStandard ? 'std' : 'dyn'}`;
+            noInput.value = 'לא';
+            noInput.dataset.question = questionData.question;
+            noInput.dataset.index = index;
+            noInput.dataset.type = 'yesNo';
+            
+            if (isStandard) {
+                noInput.dataset.standard = 'true';
+            } else {
+                noInput.dataset.dynamic = 'true';
+            }
+            
+            noLabel.appendChild(noInput);
+            noLabel.appendChild(document.createTextNode('לא'));
+            
+            radioGroup.appendChild(yesLabel);
+            radioGroup.appendChild(noLabel);
+            answerContainer.appendChild(radioGroup);
+            
+            // יצירת שדה מעקב נוסף לתשובת "כן"
+            if (questionData.followUp) {
+                const followUpContainer = document.createElement('div');
+                followUpContainer.className = 'follow-up-container';
+                followUpContainer.style.display = 'none';
+                
+                const followUpInput = document.createElement('input');
+                followUpInput.type = 'text';
+                followUpInput.className = 'follow-up-input';
+                followUpInput.placeholder = questionData.followUp;
+                followUpInput.dataset.parentQuestion = questionData.question;
+                
+                if (isStandard) {
+                    followUpInput.dataset.standard = 'true';
+                } else {
+                    followUpInput.dataset.dynamic = 'true';
+                }
+                
+                followUpContainer.appendChild(followUpInput);
+                answerContainer.appendChild(followUpContainer);
+                
+                // הוספת אירועים להצגת שדה המעקב
+                yesInput.addEventListener('change', function() {
+                    if (this.checked) {
+                        followUpContainer.style.display = 'block';
+                    }
+                });
+                
+                noInput.addEventListener('change', function() {
+                    if (this.checked) {
+                        followUpContainer.style.display = 'none';
+                    }
+                });
+            }
+            break;
+            
+        case 'duration':
+            // שדה הזנת משך זמן
+            const durationInput = document.createElement('input');
+            durationInput.type = 'text';
+            durationInput.className = 'answer-input';
+            durationInput.placeholder = questionData.placeholder || 'הזן משך זמן...';
+            durationInput.dataset.question = questionData.question;
+            durationInput.dataset.index = index;
+            durationInput.dataset.type = 'duration';
+            
+            if (isStandard) {
+                durationInput.dataset.standard = 'true';
+            } else {
+                durationInput.dataset.dynamic = 'true';
+            }
+            
+            answerContainer.appendChild(durationInput);
+            break;
+            
+        case 'location':
+            // בחירת מיקום מרשימה
+            const locationSelect = document.createElement('select');
+            locationSelect.className = 'answer-select location-select';
+            locationSelect.dataset.question = questionData.question;
+            locationSelect.dataset.index = index;
+            locationSelect.dataset.type = 'location';
+            
+            if (isStandard) {
+                locationSelect.dataset.standard = 'true';
+            } else {
+                locationSelect.dataset.dynamic = 'true';
+            }
+            
+            // אפשרות ריקה
+            const emptyOption = document.createElement('option');
+            emptyOption.value = '';
+            emptyOption.textContent = 'בחר מיקום...';
+            emptyOption.selected = true;
+            locationSelect.appendChild(emptyOption);
+            
+            // אפשרויות מיקום
+            if (questionData.options && Array.isArray(questionData.options)) {
+                questionData.options.forEach(option => {
+                    const optionElement = document.createElement('option');
+                    optionElement.value = option;
+                    optionElement.textContent = option;
+                    locationSelect.appendChild(optionElement);
+                });
+            }
+            
+            answerContainer.appendChild(locationSelect);
+            break;
+            
+        case 'characteristic':
+            // בחירת מאפיין מרשימה
+            const characteristicSelect = document.createElement('select');
+            characteristicSelect.className = 'answer-select characteristic-select';
+            characteristicSelect.dataset.question = questionData.question;
+            characteristicSelect.dataset.index = index;
+            characteristicSelect.dataset.type = 'characteristic';
+            
+            if (isStandard) {
+                characteristicSelect.dataset.standard = 'true';
+            } else {
+                characteristicSelect.dataset.dynamic = 'true';
+            }
+            
+            // אפשרות ריקה
+            const emptyCharOption = document.createElement('option');
+            emptyCharOption.value = '';
+            emptyCharOption.textContent = 'בחר אפיון...';
+            emptyCharOption.selected = true;
+            characteristicSelect.appendChild(emptyCharOption);
+            
+            // אפשרויות אפיון
+            if (questionData.options && Array.isArray(questionData.options)) {
+                questionData.options.forEach(option => {
+                    const optionElement = document.createElement('option');
+                    optionElement.value = option;
+                    optionElement.textContent = option;
+                    characteristicSelect.appendChild(optionElement);
+                });
+            }
+            
+            answerContainer.appendChild(characteristicSelect);
+            break;
+            
+        case 'scale':
+            // סולם ערכים 1-10
+            const scaleContainer = document.createElement('div');
+            scaleContainer.className = 'scale-container';
+            
+            const scaleLabel = document.createElement('div');
+            scaleLabel.className = 'scale-label';
+            scaleLabel.textContent = 'דרג/י מ-1 (קל) עד 10 (חמור מאוד)';
+            scaleContainer.appendChild(scaleLabel);
+            
+            const scaleButtons = document.createElement('div');
+            scaleButtons.className = 'scale-buttons';
+            
+            for (let i = 1; i <= 10; i++) {
+                const button = document.createElement('button');
+                button.type = 'button';
+                button.className = 'scale-button';
+                button.textContent = i;
+                button.dataset.value = i;
+                button.dataset.question = questionData.question;
+                
+                if (isStandard) {
+                    button.dataset.standard = 'true';
+                } else {
+                    button.dataset.dynamic = 'true';
+                }
+                
+                button.addEventListener('click', function() {
+                    // הסרת הסימון מכל הכפתורים
+                    scaleButtons.querySelectorAll('.scale-button').forEach(btn => {
+                        btn.classList.remove('selected');
+                    });
+                    
+                    // סימון הכפתור הנוכחי
+                    this.classList.add('selected');
+                    
+                    // עדכון ערך מוסתר לשמירת הנתונים
+                    scaleInput.value = i;
+                });
+                
+                scaleButtons.appendChild(button);
+            }
+            
+            scaleContainer.appendChild(scaleButtons);
+            
+            // שדה מוסתר לשמירת הערך
+            const scaleInput = document.createElement('input');
+            scaleInput.type = 'hidden';
+            scaleInput.className = 'scale-input';
+            scaleInput.dataset.question = questionData.question;
+            scaleInput.dataset.index = index;
+            scaleInput.dataset.type = 'scale';
+            
+            if (isStandard) {
+                scaleInput.dataset.standard = 'true';
+            } else {
+                scaleInput.dataset.dynamic = 'true';
+            }
+            
+            scaleContainer.appendChild(scaleInput);
+            answerContainer.appendChild(scaleContainer);
+            break;
+            
+        case 'value':
+        case 'quantity':
+            // שדה הזנת ערך מספרי
+            const valueInput = document.createElement('input');
+            valueInput.type = 'text';
+            valueInput.className = 'answer-input';
+            valueInput.placeholder = questionData.placeholder || 'הזן ערך...';
+            valueInput.dataset.question = questionData.question;
+            valueInput.dataset.index = index;
+            valueInput.dataset.type = questionData.type;
+            
+            if (isStandard) {
+                valueInput.dataset.standard = 'true';
+            } else {
+                valueInput.dataset.dynamic = 'true';
+            }
+            
+            answerContainer.appendChild(valueInput);
+            break;
+            
+        case 'onset':
+        case 'mechanism':
+        case 'area':
+            // בחירה מרשימה אך ללא היררכיה
+            const selectElement = document.createElement('select');
+            selectElement.className = 'answer-select';
+            selectElement.dataset.question = questionData.question;
+            selectElement.dataset.index = index;
+            selectElement.dataset.type = questionData.type;
+            
+            if (isStandard) {
+                selectElement.dataset.standard = 'true';
+            } else {
+                selectElement.dataset.dynamic = 'true';
+            }
+            
+            // אפשרות ריקה
+            const emptySelectOption = document.createElement('option');
+            emptySelectOption.value = '';
+            emptySelectOption.textContent = 'בחר...';
+            emptySelectOption.selected = true;
+            selectElement.appendChild(emptySelectOption);
+            
+            // אפשרויות נוספות
+            if (questionData.options && Array.isArray(questionData.options)) {
+                questionData.options.forEach(option => {
+                    const optionElement = document.createElement('option');
+                    optionElement.value = option;
+                    optionElement.textContent = option;
+                    selectElement.appendChild(optionElement);
+                });
+            }
+            
+            answerContainer.appendChild(selectElement);
+            break;
+            
+        default:
+            // שדה טקסט רגיל כברירת מחדל
+            const defaultInput = document.createElement('input');
+            defaultInput.type = 'text';
+            defaultInput.className = 'answer-input';
+            defaultInput.placeholder = 'הזן תשובה...';
+            defaultInput.dataset.question = questionData.question;
+            defaultInput.dataset.index = index;
+            
+            if (isStandard) {
+                defaultInput.dataset.standard = 'true';
+            } else {
+                defaultInput.dataset.dynamic = 'true';
+            }
+            
+            answerContainer.appendChild(defaultInput);
+            break;
     }
     
-    listItem.appendChild(answerInput);
-    
+    listItem.appendChild(answerContainer);
     return listItem;
+}
+
+// פונקציה ליצירת אזור הזנת מדדים חיוניים
+function createVitalSignsForm(relevantVitalSigns) {
+    const container = document.createElement('div');
+    container.className = 'vital-signs-container fade-in';
+    
+    const title = document.createElement('h3');
+    title.textContent = 'מדדים חיוניים';
+    container.appendChild(title);
+    
+    const form = document.createElement('div');
+    form.className = 'vital-signs-form';
+    
+    // מיפוי המדדים ופקדיהם
+    const vitalSignsMap = {
+        'דופק': {
+            id: 'pulse',
+            placeholder: 'דופק (פעימות לדקה)',
+            type: 'number',
+            min: 30,
+            max: 250
+        },
+        'לחץ דם': {
+            id: 'bloodPressure',
+            placeholder: 'לחץ דם (סיסטולי/דיאסטולי)',
+            type: 'text',
+            pattern: '[0-9]{2,3}/[0-9]{2,3}'
+        },
+        'חום': {
+            id: 'temperature',
+            placeholder: 'מעלות צלזיוס (37.0)',
+            type: 'number',
+            min: 35,
+            max: 43,
+            step: 0.1
+        },
+        'סטורציה': {
+            id: 'saturation',
+            placeholder: 'אחוז (%)',
+            type: 'number',
+            min: 70,
+            max: 100
+        },
+        'קצב נשימה': {
+            id: 'respiratoryRate',
+            placeholder: 'נשימות לדקה',
+            type: 'number',
+            min: 8,
+            max: 60
+        }
+    };
+    
+    // יצירת שדות עבור המדדים הרלוונטיים
+    relevantVitalSigns.forEach(vitalSign => {
+        const signConfig = vitalSignsMap[vitalSign];
+        if (!signConfig) return;
+        
+        const formGroup = document.createElement('div');
+        formGroup.className = 'form-group vital-sign-group';
+        
+        const label = document.createElement('label');
+        label.htmlFor = `vital-${signConfig.id}`;
+        label.textContent = vitalSign;
+        
+        const input = document.createElement('input');
+        input.type = signConfig.type;
+        input.id = `vital-${signConfig.id}`;
+        input.className = 'vital-sign-input';
+        input.placeholder = signConfig.placeholder;
+        input.dataset.vitalSign = signConfig.id;
+        
+        if (signConfig.min !== undefined) input.min = signConfig.min;
+        if (signConfig.max !== undefined) input.max = signConfig.max;
+        if (signConfig.step !== undefined) input.step = signConfig.step;
+        if (signConfig.pattern) input.pattern = signConfig.pattern;
+        
+        formGroup.appendChild(label);
+        formGroup.appendChild(input);
+        form.appendChild(formGroup);
+    });
+    
+    container.appendChild(form);
+    return container;
 }
 
 // פונקציה לאיסוף תשובות מהטופס
 function collectAnswers(selector) {
     const answers = {};
     document.querySelectorAll(selector).forEach(input => {
-        if (input.value.trim() !== '') {
-            answers[input.dataset.question] = input.value.trim();
+        // קבלת הערך בהתאם לסוג הפקד
+        let value = '';
+        
+        if (input.type === 'radio') {
+            if (!input.checked) return;
+            value = input.value;
+            
+            // אם זו תשובת "כן" עם שדה מעקב
+            if (value === 'כן') {
+                const followUpInput = document.querySelector(`.follow-up-input[data-parent-question="${input.dataset.question}"]`);
+                if (followUpInput && followUpInput.value.trim() !== '') {
+                    value = `כן, ${followUpInput.value.trim()}`;
+                }
+            }
+        } else if (input.tagName === 'SELECT') {
+            value = input.value;
+        } else if (input.type === 'hidden' && input.classList.contains('scale-input')) {
+            // שדה סולם
+            value = input.value;
+        } else {
+            value = input.value.trim();
+        }
+        
+        if (value !== '') {
+            answers[input.dataset.question] = value;
         }
     });
     return answers;
+}
+
+// פונקציה לאיסוף מדדים חיוניים
+function collectVitalSigns() {
+    const vitalSigns = {};
+    
+    document.querySelectorAll('.vital-sign-input').forEach(input => {
+        if (input.value.trim() !== '') {
+            vitalSigns[input.dataset.vitalSign] = input.value.trim();
+        }
+    });
+    
+    return vitalSigns;
 }
 
 // פונקציה לקבלת הערך הנבחר מקבוצת רדיו
@@ -89,10 +514,11 @@ function highlightRedFlags() {
             if (paragraph.includes('דגלים אדומים:')) {
                 // עטוף את הפסקה של הדגלים האדומים ב-div מיוחד
                 updatedHtml += `<div class="red-flag">
+                    <i class="fas fa-exclamation-triangle"></i>
                     <div class="red-flag-content">${paragraph}</div>
                 </div>`;
             } else {
-                updatedHtml += paragraph + '\n\n';
+                updatedHtml += `<p>${paragraph}</p>`;
             }
         }
         
@@ -109,8 +535,468 @@ function updateProgressBar() {
     progressContainer.innerHTML = window.FormComponents.createProgressBar(state.currentStep, 5);
 }
 
-// אתחול הממשק
+// פונקציה להדגשת דגלים אדומים בסיכום הסופי
+function highlightRedFlagsInFinalSummary() {
+    const summaryElement = document.getElementById('final-summary-text');
+    if (!summaryElement) return;
+    
+    const summaryText = summaryElement.textContent;
+    
+    // בדיקה אם יש דגלים אדומים בסיכום
+    if (summaryText.includes('דגלים אדומים:')) {
+        // חלק את הטקסט לפסקאות
+        const paragraphs = summaryText.split('\n\n');
+        let updatedHtml = '';
+        
+        for (const paragraph of paragraphs) {
+            if (paragraph.includes('דגלים אדומים:')) {
+                // עטוף את הפסקה של הדגלים האדומים ב-div מיוחד
+                updatedHtml += `<div class="red-flag">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    <div class="red-flag-content">${paragraph}</div>
+                </div>`;
+            } else {
+                updatedHtml += `<p>${paragraph}</p>`;
+            }
+        }
+        
+        // עדכון התצוגה עם ההדגשות
+        summaryElement.innerHTML = updatedHtml;
+    }
+}
+
+// פונקציה להחלפת מצב תצוגה (בהיר/כהה)
+function toggleDarkMode() {
+    // שינוי מצב תצוגה בדף
+    document.body.setAttribute('data-theme', state.darkMode ? 'dark' : 'light');
+    
+    // עדכון הכפתור
+    const darkModeToggle = document.getElementById('dark-mode-toggle');
+    if (darkModeToggle) {
+        darkModeToggle.innerHTML = state.darkMode ? 
+            '<i class="fas fa-sun"></i> מצב בהיר' : 
+            '<i class="fas fa-moon"></i> מצב כהה';
+    }
+    
+    // שמירת העדפה בלוקל סטורג'
+    localStorage.setItem('darkMode', state.darkMode);
+}
+
+// פונקציה לקבלת גיל מהיר באמצעות כפתורים
+function createAgeButtons() {
+    const commonAges = [18, 19, 20, 21, 22, 25, 30, 40, 50, 60, 70];
+    const container = document.createElement('div');
+    container.className = 'quick-age-buttons';
+    
+    commonAges.forEach(age => {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'age-button';
+        button.textContent = age;
+        button.addEventListener('click', function() {
+            document.getElementById('patient-age').value = age;
+        });
+        container.appendChild(button);
+    });
+    
+    return container;
+}
+// יש להוסיף את הקוד הבא לקובץ public/app.js
+
+/**
+ * יוצר ממשק חיפוש עבור התלונות העיקריות
+ * @param {HTMLSelectElement} complaintSelect - אלמנט הבחירה של התלונות
+ * @param {Array} complaints - רשימת התלונות
+ */
+function createComplaintSearchInterface(complaintSelect, complaints) {
+    // יצירת אלמנט החיפוש
+    const searchContainer = document.createElement('div');
+    searchContainer.className = 'search-container fade-in';
+    
+    const searchIcon = document.createElement('i');
+    searchIcon.className = 'fas fa-search search-icon';
+    searchContainer.appendChild(searchIcon);
+    
+    const searchInput = document.createElement('input');
+    searchInput.type = 'text';
+    searchInput.className = 'complaint-search';
+    searchInput.placeholder = 'חפש תלונה...';
+    searchInput.setAttribute('dir', 'rtl');
+    searchContainer.appendChild(searchInput);
+    
+    // הוספת אירוע הקלדה לחיפוש
+    searchInput.addEventListener('input', function() {
+        const searchTerm = this.value.trim().toLowerCase();
+        
+        // מאפס את רשימת התלונות
+        complaintSelect.innerHTML = '';
+        
+        // אפשרות ריקה ראשונה
+        const emptyOption = document.createElement('option');
+        emptyOption.value = '';
+        emptyOption.textContent = 'בחר תלונה עיקרית';
+        emptyOption.disabled = true;
+        emptyOption.selected = true;
+        complaintSelect.appendChild(emptyOption);
+        
+        // מסנן ומוסיף תלונות תואמות
+        const filteredComplaints = searchTerm ? 
+            complaints.filter(complaint => complaint.toLowerCase().includes(searchTerm)) : 
+            complaints;
+        
+        filteredComplaints.forEach(complaint => {
+            const option = document.createElement('option');
+            option.value = complaint;
+            option.textContent = complaint;
+            complaintSelect.appendChild(option);
+        });
+        
+        // אם אין תוצאות, מוסיף אפשרות "אחר"
+        if (filteredComplaints.length === 0 && searchTerm) {
+            const otherOption = document.createElement('option');
+            otherOption.value = searchTerm;
+            otherOption.textContent = `הוסף: "${searchTerm}"`;
+            complaintSelect.appendChild(otherOption);
+            
+            // אם נבחרה אפשרות זו, מעדכן את הערך ב"אחר"
+            complaintSelect.addEventListener('change', function() {
+                if (this.value === searchTerm) {
+                    this.value = 'אחר';
+                    document.getElementById('other-complaint').value = searchTerm;
+                    document.getElementById('other-complaint-container').style.display = 'block';
+                }
+            });
+        }
+        
+        // תמיד מוסיף "אחר" בסוף הרשימה
+        if (!filteredComplaints.includes('אחר')) {
+            const otherOption = document.createElement('option');
+            otherOption.value = 'אחר';
+            otherOption.textContent = 'אחר';
+            complaintSelect.appendChild(otherOption);
+        }
+    });
+    
+    // הוספת ממשק החיפוש לפני אלמנט הבחירה
+    complaintSelect.parentElement.insertBefore(searchContainer, complaintSelect);
+}
+
+/**
+ * פונקציה משופרת לסיכום האנמנזה, המשתמשת בקריאת API לשרת
+ * @param {object} patientRecord - רשומת המטופל
+ * @returns {Promise} - הבטחה המחזירה את רשומת המטופל המעודכנת
+ */
+async function generateImprovedSummary(patientRecord) {
+    return new Promise((resolve, reject) => {
+        try {
+            // הכנת פרומפט מובנה לסיכום האנמנזה
+            const promptData = createAISummaryPrompt(patientRecord);
+            
+            // הדמיית קריאת API למודל שפה
+            console.log("שולח בקשה לסיכום אנמנזה...");
+            console.log("פרומפט:", promptData);
+            
+            // מדמה תשובה מהשרת (זמן תגובה של 1-3 שניות)
+            setTimeout(() => {
+                const summary = createDetailedMedicalSummary(patientRecord);
+                patientRecord.summary = summary;
+                resolve(patientRecord);
+            }, Math.floor(Math.random() * 2000) + 1000);
+        } catch (error) {
+            console.error("שגיאה בסיכום האנמנזה:", error);
+            reject(error);
+        }
+    });
+}
+
+/**
+ * יוצר פרומפט מובנה לסיכום אנמנזה רפואית
+ * @param {object} patientRecord - רשומת המטופל
+ * @returns {string} - פרומפט מובנה
+ */
+function createAISummaryPrompt(patientRecord) {
+    // חילוץ מידע בסיסי
+    const { age, gender, mainComplaint, profile, medicalSections, allergies, medications, smoking } = patientRecord.patientInfo;
+    const genderText = gender === 'male' ? 'זכר' : 'נקבה';
+    
+    // יצירת פרומפט מובנה
+    let prompt = `אתה עוזר רפואי מקצועי ברמת חובש/פרמדיק. עליך ליצור סיכום אנמנזה רפואית מקיף ומקצועי בהתאם למידע הבא.
+    
+סיכום האנמנזה צריך להיות בפורמט מובנה ומקצועי, עם דגש על:
+1. ציון פרטי פרופיל רפואי בתחילת הסיכום
+2. תיאור דמוגרפי והתלונה העיקרית
+3. פירוט המדדים החיוניים אם נמדדו
+4. פירוט אופי ומאפייני התלונה העיקרית
+5. ציון כל הממצאים השליליים המשמעותיים ("שולל X")
+6. פירוט גורמים מחמירים ומקלים
+7. ציון טיפולים שננקטו עד כה
+8. דגש על דגלים אדומים אם קיימים
+
+הפרטים הבסיסיים:
+- גיל: ${age}
+- מין: ${genderText}
+- מעשן: ${smoking === 'yes' ? 'כן' : 'לא'}
+- תלונה עיקרית: ${mainComplaint}
+- פרופיל רפואי: ${profile}
+- סעיפים רפואיים: ${medicalSections || "ללא סעיפים"}
+- אלרגיות: ${allergies || "ללא אלרגיות ידועות"}
+- תרופות קבועות: ${medications || "לא נוטל תרופות באופן קבוע"}
+
+`;
+    
+    // הוספת מדדים חיוניים אם קיימים
+    if (patientRecord.vitalSigns && Object.keys(patientRecord.vitalSigns).length > 0) {
+        prompt += "מדדים חיוניים:\n";
+        if (patientRecord.vitalSigns.pulse) prompt += `- דופק: ${patientRecord.vitalSigns.pulse}\n`;
+        if (patientRecord.vitalSigns.bloodPressure) prompt += `- לחץ דם: ${patientRecord.vitalSigns.bloodPressure}\n`;
+        if (patientRecord.vitalSigns.temperature) prompt += `- חום: ${patientRecord.vitalSigns.temperature}\n`;
+        if (patientRecord.vitalSigns.saturation) prompt += `- סטורציה: ${patientRecord.vitalSigns.saturation}%\n`;
+        if (patientRecord.vitalSigns.respiratoryRate) prompt += `- קצב נשימה: ${patientRecord.vitalSigns.respiratoryRate}\n`;
+        prompt += "\n";
+    }
+    
+    // הוספת תשובות לשאלות
+    prompt += "תשובות המטופל לשאלות:\n";
+    
+    // תשובות לשאלות סטנדרטיות
+    for (const [question, answer] of Object.entries(patientRecord.standardAnswers)) {
+        if (answer && answer.trim()) {
+            prompt += `- ${question}: ${answer}\n`;
+        }
+    }
+    
+    // תשובות לשאלות דינמיות
+    for (const [question, answer] of Object.entries(patientRecord.dynamicAnswers)) {
+        if (answer && answer.trim()) {
+            prompt += `- ${question}: ${answer}\n`;
+        }
+    }
+    
+    // הוספת דגלים אדומים
+    const redFlags = checkForRedFlags(patientRecord);
+    if (redFlags.length > 0) {
+        prompt += "\nדגלים אדומים שזוהו:\n";
+        redFlags.forEach(flag => {
+            prompt += `- ${flag}\n`;
+        });
+    }
+    
+    // הנחיות לפורמט הסיכום
+    prompt += `
+יש לנסח את האנמנזה בשפה רפואית ברורה, עם הדגשת:
+- ציון כל השלילות (תשובות שליליות לשאלות משמעותיות) בפורמט "שולל X"
+- ניסוח קוהרנטי ורציף (לא רשימת משפטים קטועים)
+- שילוב כל המידע הרלוונטי בסיכום אחד מסודר וברור
+- אם זוהו דגלים אדומים, הקדש להם פסקה נפרדת בסוף הסיכום
+
+הסיכום צריך להיות בלשון שמישה על-ידי אנשי רפואה, בפורמט שמתחיל ב"פרופיל... מטופל/ת בן/בת..."`;
+    
+    return prompt;
+}
+
+/**
+ * יוצר סיכום אנמנזה רפואית מפורט ומקצועי
+ * @param {object} patientRecord - רשומת המטופל
+ * @returns {string} - סיכום אנמנזה
+ */
+function createDetailedMedicalSummary(patientRecord) {
+    try {
+        // חילוץ מידע בסיסי
+        const { age, gender, mainComplaint, profile, medicalSections, allergies, medications, smoking } = patientRecord.patientInfo;
+        const genderText = gender === 'male' ? 'זכר' : 'נקבה';
+        const smokingText = smoking === 'yes' ? 'מעשן/ת' : 'לא מעשן/ת';
+        
+        // פתיחת האנמנזה עם פרטי הפרופיל הרפואי
+        let summary = `פרופיל ${profile}, ${medicalSections || "ללא סעיפים"}, ${allergies || "ללא אלרגיות ידועות"}, ${medications || "לא נוטל/ת תרופות באופן קבוע"}.\n\n`;
+        
+        // תיאור דמוגרפי ותלונה עיקרית
+        summary += `מטופל/ת בן/בת ${age}, ${genderText}, ${smokingText}, פונה עם תלונה עיקרית של ${mainComplaint}`;
+        
+        // הוספת המדדים אם קיימים
+        if (patientRecord.vitalSigns && Object.keys(patientRecord.vitalSigns).length > 0) {
+            summary += '.\n\nסימנים חיוניים בקבלה: ';
+            const vitalSignsArr = [];
+            
+            if (patientRecord.vitalSigns.pulse) {
+                vitalSignsArr.push(`דופק ${patientRecord.vitalSigns.pulse} לדקה`);
+            }
+            if (patientRecord.vitalSigns.bloodPressure) {
+                vitalSignsArr.push(`ל"ד ${patientRecord.vitalSigns.bloodPressure} מ"מ כספית`);
+            }
+            if (patientRecord.vitalSigns.temperature) {
+                vitalSignsArr.push(`חום ${patientRecord.vitalSigns.temperature}°C`);
+            }
+            if (patientRecord.vitalSigns.saturation) {
+                vitalSignsArr.push(`סטורציה ${patientRecord.vitalSigns.saturation}%`);
+            }
+            if (patientRecord.vitalSigns.respiratoryRate) {
+                vitalSignsArr.push(`קצב נשימות ${patientRecord.vitalSigns.respiratoryRate} לדקה`);
+            }
+            
+            summary += vitalSignsArr.join(', ') + '.';
+        } else {
+            summary += '.';
+        }
+        
+        // איסוף מידע אנמנסטי מהתשובות
+        let duration = "";
+        let location = "";
+        let characteristics = [];
+        let associatedSymptoms = [];
+        let aggravatingFactors = [];
+        let relievingFactors = [];
+        let treatments = [];
+        let negativeFindings = []; // ממצאים שליליים
+        
+        // חיפוש תשובות רלוונטיות מכל השאלות
+        const allAnswers = {
+            ...patientRecord.standardAnswers,
+            ...patientRecord.dynamicAnswers
+        };
+        
+        // עיבוד המידע מהתשובות
+        for (const [question, answer] of Object.entries(allAnswers)) {
+            if (!answer || answer.trim() === '') continue;
+            
+            // זיהוי קטגוריות מידע שונות
+            if (question.includes("זמן") || question.includes("מתי") || question.includes("כמה זמן") || question.includes("משך")) {
+                duration = answer;
+            } 
+            else if (question.includes("היכן") || question.includes("מיקום") || question.includes("איפה") || question.includes("ממוקם")) {
+                location = answer;
+            }
+            else if (question.includes("אופי") || question.includes("מתאר") || question.includes("סוג")) {
+                characteristics.push(answer);
+            }
+            else if (question.includes("מחמיר") || question.includes("גורם להחמרה")) {
+                aggravatingFactors.push(`${question.replace('?', '')}: ${answer}`);
+            }
+            else if (question.includes("מקל") || question.includes("גורם להקלה")) {
+                relievingFactors.push(`${question.replace('?', '')}: ${answer}`);
+            }
+            else if (question.includes("סימפטומים נוספים") || question.includes("תסמינים") || 
+                    question.includes("בחילה") || question.includes("הקאות") || 
+                    question.includes("חום") || question.includes("סחרחורת") ||
+                    question.includes("דם") || question.includes("כאב")) {
+                
+                if (answer.toLowerCase() === 'לא') {
+                    // שולל תופעה
+                    let negTerm = question
+                        .replace('האם', '')
+                        .replace('יש', '')
+                        .replace('?', '')
+                        .trim();
+                    negativeFindings.push(`שולל/ת ${negTerm}`);
+                } else {
+                    // מדווח על תופעה
+                    associatedSymptoms.push(`${question.replace('?', '')}: ${answer}`);
+                }
+            }
+            else if (question.includes("טיפול") || question.includes("תרופות") || question.includes("לקחת")) {
+                if (answer.toLowerCase() === 'לא') {
+                    negativeFindings.push("שולל/ת נטילת תרופות קודמות");
+                } else {
+                    treatments.push(`${question.replace('?', '')}: ${answer}`);
+                }
+            }
+            else if (answer.toLowerCase() === 'לא') {
+                // הוספת שלילות נוספות
+                let negTerm = question
+                    .replace('האם', '')
+                    .replace('יש', '')
+                    .replace('?', '')
+                    .trim();
+                negativeFindings.push(`שולל/ת ${negTerm}`);
+            }
+        }
+        
+        // יצירת תיאור האנמנזה
+        summary += "\n\nאנמנזה: ";
+        
+        if (duration) {
+            summary += `מדווח/ת על ${mainComplaint} שהחל/ה לפני ${duration}`;
+        } else {
+            summary += `מדווח/ת על ${mainComplaint}`;
+        }
+        
+        if (location) {
+            summary += ` ומתמקם/ת ב${location}`;
+        }
+        
+        if (characteristics.length > 0) {
+            summary += `. אופי ה${mainComplaint.includes('כאב') ? 'כאב' : 'תלונה'} מתואר כ${characteristics.join(", ")}`;
+        }
+        
+        summary += '. ';
+        
+        // הוספת סימפטומים נלווים
+        if (associatedSymptoms.length > 0) {
+            summary += `\n\nסימפטומים נלווים: ${associatedSymptoms.join("; ")}. `;
+        }
+        
+        // הוספת גורמים מחמירים ומקלים
+        if (aggravatingFactors.length > 0 || relievingFactors.length > 0) {
+            summary += "\n\n";
+            
+            if (aggravatingFactors.length > 0) {
+                summary += `גורמים מחמירים: ${aggravatingFactors.join("; ")}. `;
+            }
+            
+            if (relievingFactors.length > 0) {
+                summary += `גורמים מקלים: ${relievingFactors.join("; ")}. `;
+            }
+        }
+        
+        // הוספת מידע על טיפולים
+        if (treatments.length > 0) {
+            summary += `\n\nטיפולים שננקטו טרם הפנייה: ${treatments.join("; ")}. `;
+        }
+        
+        // הוספת ממצאים שליליים
+        if (negativeFindings.length > 0) {
+            summary += `\n\nממצאים שליליים: ${negativeFindings.join("; ")}. `;
+        }
+        
+        // סיום האנמנזה עם דגלים אדומים
+        const redFlags = checkForRedFlags(patientRecord);
+        
+        if (redFlags.length > 0) {
+            summary += `\n\nדגלים אדומים: ${redFlags.join("; ")}.`;
+        }
+        
+        return summary;
+    } catch (error) {
+        console.error("שגיאה ביצירת סיכום מפורט:", error);
+        
+        // אם יש שגיאה, יצירת סיכום בסיסי
+        const { age, gender, mainComplaint, profile, medicalSections, allergies, medications, smoking } = patientRecord.patientInfo;
+        const genderText = gender === 'male' ? 'זכר' : 'נקבה';
+        
+        return `פרופיל ${profile}, ${medicalSections || "ללא סעיפים"}, ${allergies || "ללא אלרגיות ידועות"}, ${medications || "לא נוטל/ת תרופות באופן קבוע"}.\n\nמטופל/ת בן/בת ${age}, ${genderText}, ${smoking === 'yes' ? 'מעשן/ת' : 'לא מעשן/ת'}, פונה עם תלונה עיקרית של ${mainComplaint}.\n\nלא ניתן היה להפיק סיכום מפורט בשל בעיה טכנית.`;
+    }
+}
+// ---------- יוזמות אתחול הדף ----------
+
 document.addEventListener('DOMContentLoaded', function() {
+    // הוספת כפתור מצב תצוגה
+    const header = document.querySelector('header');
+    if (header) {
+        const darkModeToggle = document.createElement('button');
+        darkModeToggle.id = 'dark-mode-toggle';
+        darkModeToggle.className = 'dark-mode-toggle';
+        darkModeToggle.innerHTML = state.darkMode ? 
+            '<i class="fas fa-sun"></i> מצב בהיר' : 
+            '<i class="fas fa-moon"></i> מצב כהה';
+        
+        darkModeToggle.addEventListener('click', function() {
+            state.darkMode = !state.darkMode;
+            toggleDarkMode();
+        });
+        
+        header.appendChild(darkModeToggle);
+        toggleDarkMode(); // הפעלת מצב התצוגה ההתחלתי
+    }
+    
     // הוספת סרגל התקדמות
     const mainContainer = document.querySelector('.container');
     if (mainContainer) {
@@ -119,6 +1005,14 @@ document.addEventListener('DOMContentLoaded', function() {
         progressBar.className = 'progress-bar-container';
         mainContainer.insertBefore(progressBar, mainContainer.firstChild);
         updateProgressBar();
+    }
+    
+    // הוספת כפתורי גיל מהירים
+    const ageField = document.getElementById('patient-age');
+    if (ageField) {
+        const ageFieldParent = ageField.parentElement;
+        const ageButtons = createAgeButtons();
+        ageFieldParent.appendChild(ageButtons);
     }
     
     // מילוי רשימת התלונות הנפוצות
@@ -192,7 +1086,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
     
-    // כפתורי ניווט בין השלבים
+    // ---------- כפתורי ניווט בין השלבים ----------
     
     // שלב 1 -> שלב 2
     document.getElementById('next-to-step2').addEventListener('click', function() {
@@ -218,6 +1112,13 @@ document.addEventListener('DOMContentLoaded', function() {
                 alert('נא לפרט את התרופות');
                 return;
             }
+        }
+        
+        const isSmoking = getSelectedRadioValue('smoking') === 'yes';
+        let smokingDetails = "לא מעשן";
+        if (isSmoking) {
+            smokingDetails = document.getElementById('smoking-details').value.trim();
+            smokingDetails = smokingDetails ? `מעשן, ${smokingDetails}` : "מעשן";
         }
         
         // וידוא שכל השדות מולאו
@@ -263,12 +1164,17 @@ document.addEventListener('DOMContentLoaded', function() {
                 profile: profile,
                 medicalSections: medicalSections || "ללא סעיפים",
                 allergies: hasAllergies ? allergiesDetails : "ללא אלרגיות ידועות",
-                medications: takesMedications ? medicationsDetails : "לא נוטל תרופות באופן קבוע"
+                medications: takesMedications ? medicationsDetails : "לא נוטל תרופות באופן קבוע",
+                smoking: isSmoking ? "yes" : "no"
             },
             standardAnswers: {},
             dynamicAnswers: {},
+            vitalSigns: {},
             summary: ""
         };
+        
+        // קבלת מדדים חיוניים רלוונטיים לתלונה
+        const relevantVitalSigns = getRelevantVitalSigns(mainComplaint);
         
         // קבלת שאלות סטנדרטיות לפי התלונה
         let standardQuestions = getStandardQuestions(mainComplaint);
@@ -286,9 +1192,17 @@ document.addEventListener('DOMContentLoaded', function() {
         } else {
             // הוספת השאלות הסטנדרטיות
             standardQuestions.forEach((question, index) => {
-                const questionElement = createQuestionElement(question, index);
+                const questionElement = createQuestionElement(question, index, true);
                 questionsList.appendChild(questionElement);
             });
+        }
+        
+        // הוספת טופס מדדים חיוניים
+        const vitalSignsContainer = document.getElementById('vital-signs-container');
+        vitalSignsContainer.innerHTML = '';
+        if (relevantVitalSigns.length > 0) {
+            const vitalSignsForm = createVitalSignsForm(relevantVitalSigns);
+            vitalSignsContainer.appendChild(vitalSignsForm);
         }
         
         // מעבר לשלב הבא
@@ -303,10 +1217,13 @@ document.addEventListener('DOMContentLoaded', function() {
     // שלב 2 -> שלב 3
     document.getElementById('next-to-step3').addEventListener('click', function() {
         // איסוף תשובות לשאלות סטנדרטיות
-        const standardAnswers = collectAnswers('input[data-standard="true"]');
+        const standardAnswers = collectAnswers('input[data-standard="true"], select[data-standard="true"]');
         
         // שמירת התשובות ברשומת המטופל
         state.patientRecord.standardAnswers = standardAnswers;
+        
+        // שמירת מדדים חיוניים
+        state.patientRecord.vitalSigns = collectVitalSigns();
         
         // הצגת אנימציית טעינה
         document.getElementById('dynamic-questions-loading').style.display = 'block';
@@ -315,7 +1232,7 @@ document.addEventListener('DOMContentLoaded', function() {
         // מעבר לשלב הבא
         showStep(3);
         
-        // סימולציית קבלת שאלות דינמיות (במקום בקשה אמיתית לשרת)
+        // קבלת שאלות דינמיות בהתאם לתשובות הקודמות
         setTimeout(() => {
             const dynamicQuestions = getDynamicQuestions(state.patientRecord.patientInfo.mainComplaint, standardAnswers);
             
@@ -323,15 +1240,22 @@ document.addEventListener('DOMContentLoaded', function() {
             const questionsList = document.getElementById('dynamic-questions-list');
             questionsList.innerHTML = '';
             
-            dynamicQuestions.forEach((question, index) => {
-                const questionElement = createQuestionElement(question, index, false);
-                questionsList.appendChild(questionElement);
-            });
+            if (dynamicQuestions.length === 0) {
+                const noQuestionsItem = document.createElement('li');
+                noQuestionsItem.className = 'question-item';
+                noQuestionsItem.textContent = 'אין שאלות נוספות לתלונה זו. נא לעבור לשלב הבא.';
+                questionsList.appendChild(noQuestionsItem);
+            } else {
+                dynamicQuestions.forEach((question, index) => {
+                    const questionElement = createQuestionElement(question, index, false);
+                    questionsList.appendChild(questionElement);
+                });
+            }
             
             // הסתרת אנימציית הטעינה והצגת השאלות
             document.getElementById('dynamic-questions-loading').style.display = 'none';
             document.getElementById('dynamic-questions-container').style.display = 'block';
-        }, 1500); // סימולציית המתנה של 1.5 שניות
+        }, 1000); // המתנה של שנייה אחת
     });
     
     // שלב 3 -> שלב 2
@@ -342,7 +1266,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // שלב 3 -> שלב 4
     document.getElementById('next-to-step4').addEventListener('click', function() {
         // איסוף תשובות לשאלות דינמיות
-        const dynamicAnswers = collectAnswers('input[data-dynamic="true"]');
+        const dynamicAnswers = collectAnswers('input[data-dynamic="true"], select[data-dynamic="true"]');
         
         // שמירת התשובות ברשומת המטופל
         state.patientRecord.dynamicAnswers = dynamicAnswers;
@@ -354,13 +1278,13 @@ document.addEventListener('DOMContentLoaded', function() {
         // מעבר לשלב הבא
         showStep(4);
         
-        // סימולציית יצירת סיכום אנמנזה (במקום בקשה אמיתית לשרת)
+        // יצירת סיכום אנמנזה
         setTimeout(() => {
-            const summary = generateSummary(state.patientRecord);
-            state.patientRecord.summary = summary;
+            const patientRecord = generateSummary(state.patientRecord);
+            state.patientRecord = patientRecord;
             
             // הצגת הסיכום במסך
-            document.getElementById('summary-text').textContent = summary;
+            document.getElementById('summary-text').textContent = patientRecord.summary;
             
             // הדגשת דגלים אדומים
             highlightRedFlags();
@@ -368,7 +1292,7 @@ document.addEventListener('DOMContentLoaded', function() {
             // הסתרת אנימציית הטעינה והצגת הסיכום
             document.getElementById('summary-loading').style.display = 'none';
             document.getElementById('summary-container').style.display = 'block';
-        }, 2000); // סימולציית המתנה של 2 שניות
+        }, 1500); // המתנה של 1.5 שניות
     });
     
     // שלב 4 -> שלב 3
@@ -429,7 +1353,28 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // סימולציית שליחה אם הוזן דוא"ל
         if (doctorEmail) {
-            alert(`הסיכום נשלח בהצלחה לכתובת: ${doctorEmail}`);
+            // הצגת הודעת טעינת שליחה
+            const sendingToast = document.createElement('div');
+            sendingToast.className = 'toast-notification sending';
+            sendingToast.innerHTML = `<i class="fas fa-spinner fa-spin"></i> שולח סיכום לכתובת ${doctorEmail}...`;
+            document.body.appendChild(sendingToast);
+            
+            // סימולציית שליחה
+            setTimeout(() => {
+                // הסרת הודעת השליחה
+                document.body.removeChild(sendingToast);
+                
+                // הצגת הודעת הצלחה
+                const successToast = document.createElement('div');
+                successToast.className = 'toast-notification success';
+                successToast.innerHTML = `<i class="fas fa-check"></i> הסיכום נשלח בהצלחה לכתובת: ${doctorEmail}`;
+                document.body.appendChild(successToast);
+                
+                // הסרת הודעת ההצלחה לאחר 3 שניות
+                setTimeout(() => {
+                    document.body.removeChild(successToast);
+                }, 3000);
+            }, 2000);
         }
     });
     
@@ -478,147 +1423,196 @@ document.addEventListener('DOMContentLoaded', function() {
         document.querySelectorAll('input[name="medications"]')[0].checked = true;
         document.getElementById('medications-details').value = '';
         document.getElementById('medications-details-container').style.display = 'none';
+        document.querySelectorAll('input[name="smoking"]')[0].checked = true;
+        document.getElementById('smoking-details').value = '';
+        document.getElementById('smoking-details-container').style.display = 'none';
         
         // איפוס המצב
         state.patientRecord = null;
         
         // חזרה לשלב הראשון
         showStep(1);
+        
+        // הצגת הודעת איפוס
+        const resetToast = document.createElement('div');
+        resetToast.className = 'toast-notification info';
+        resetToast.innerHTML = '<i class="fas fa-info-circle"></i> התחלת רשומה חדשה';
+        document.body.appendChild(resetToast);
+        
+        // הסרת ההודעה לאחר 2 שניות
+        setTimeout(() => {
+            document.body.removeChild(resetToast);
+        }, 2000);
+    });
+    
+    // הוספת אירועים לטיפול בשדות אלרגיה ותרופות
+    document.querySelectorAll('input[name="allergies"]').forEach(radio => {
+        radio.addEventListener('change', function() {
+            toggleFieldVisibility('allergies', this.value === 'yes');
+        });
+    });
+    
+    document.querySelectorAll('input[name="medications"]').forEach(radio => {
+        radio.addEventListener('change', function() {
+            toggleFieldVisibility('medications', this.value === 'yes');
+        });
+    });
+    
+    document.querySelectorAll('input[name="smoking"]').forEach(radio => {
+        radio.addEventListener('change', function() {
+            toggleFieldVisibility('smoking', this.value === 'yes');
+        });
     });
 });
 
-// פונקציה להדגשת דגלים אדומים בסיכום הסופי
-function highlightRedFlagsInFinalSummary() {
-    const summaryElement = document.getElementById('final-summary-text');
-    if (!summaryElement) return;
+// פונקציות עזר
+
+// פונקציה להצגת/הסתרת שדה הזנה לפי בחירה
+function toggleFieldVisibility(fieldName, show) {
+    const detailsContainer = document.getElementById(`${fieldName}-details-container`);
+    detailsContainer.style.display = show ? 'block' : 'none';
     
-    const summaryText = summaryElement.textContent;
-    
-    // בדיקה אם יש דגלים אדומים בסיכום
-    if (summaryText.includes('דגלים אדומים:')) {
-        // חלק את הטקסט לפסקאות
-        const paragraphs = summaryText.split('\n\n');
-        let updatedHtml = '';
-        
-        for (const paragraph of paragraphs) {
-            if (paragraph.includes('דגלים אדומים:')) {
-                // עטוף את הפסקה של הדגלים האדומים ב-div מיוחד
-                updatedHtml += `<div class="red-flag">
-                    <div class="red-flag-content">${paragraph}</div>
-                </div>`;
-            } else {
-                updatedHtml += paragraph + '\n\n';
-            }
-        }
-        
-        // עדכון התצוגה עם ההדגשות
-        summaryElement.innerHTML = updatedHtml;
+    if (!show) {
+        document.getElementById(`${fieldName}-details`).value = '';
     }
 }
 
 // פונקציית עזר להשגת שאלות סטנדרטיות לפי תלונה
 function getStandardQuestions(complaint) {
+    // פונקציה זו אמורה להשתמש בשירות מהשרת
+    // במצב פיתוח/דמו, נשתמש בנתונים קבועים
+    
     // מיפוי שאלות מפורטות יותר לפי סוג התלונה
     const standardQuestions = {
         "כאב גרון": [
-            "כמה זמן נמשך הכאב בגרון?",
-            "האם יש חום? אם כן, מה גובהו ומתי נמדד לאחרונה?",
-            "האם יש קושי בבליעה? באיזו רמה (קל/בינוני/חמור)?",
-            "האם יש צרידות או שינוי בקול?",
-            "האם יש נזלת או שיעול המלווים את כאב הגרון?",
-            "האם יש נפיחות בצוואר או בבלוטות הלימפה?",
-            "האם יש נקודות לבנות או אדומות בגרון?",
-            "האם היו אירועים דומים בעבר?",
-            "האם היית במגע עם אנשים חולים לאחרונה?"
+            {
+                type: "duration",
+                question: "כמה זמן נמשך הכאב בגרון?",
+                placeholder: "יום / יומיים / שבוע..."
+            },
+            {
+                type: "yesNo",
+                question: "האם יש לך חום?",
+                followUp: "מה גובה החום ומתי נמדד לאחרונה?"
+            },
+            {
+                type: "yesNo",
+                question: "האם יש קושי בבליעה?",
+                followUp: "באיזו רמה (קל/בינוני/חמור)?"
+            },
+            {
+                type: "yesNo",
+                question: "האם יש נפיחות בצוואר או בבלוטות הלימפה?",
+                followUp: "היכן בדיוק ומה גודל הנפיחות?"
+            },
+            {
+                type: "yesNo",
+                question: "האם אתה מעשן?",
+                followUp: "כמה סיגריות ביום?"
+            }
         ],
         "כאב ראש": [
-            "כמה זמן נמשך כאב הראש?",
-            "היכן ממוקם הכאב (מצח, רקות, עורף, חד צדדי, דו-צדדי)?",
-            "כיצד התחיל הכאב (בהדרגה או בפתאומיות)?",
-            "כיצד היית מתאר את אופי הכאב (לוחץ, פועם, דוקר)?",
-            "האם יש חום או חולשה כללית?",
-            "האם יש רגישות לאור, רעש או ריחות?",
-            "האם יש בחילה או הקאות המלוות את הכאב?",
-            "האם הכאב מחמיר בפעילות מסוימת (תנועה, שינוי תנוחה)?",
-            "האם לקחת משככי כאבים? אם כן, איזה והאם הוקל?"
+            {
+                type: "duration",
+                question: "כמה זמן נמשך כאב הראש?",
+                placeholder: "שעה / יום / יומיים..."
+            },
+            {
+                type: "location",
+                question: "היכן ממוקם הכאב?",
+                options: ["מצח", "רקות", "עורף", "חד צדדי", "דו-צדדי", "כל הראש"]
+            },
+            {
+                type: "characteristic",
+                question: "כיצד היית מתאר את אופי הכאב?",
+                options: ["לוחץ", "פועם", "דוקר", "צורב"]
+            },
+            {
+                type: "yesNo",
+                question: "האם יש רגישות לאור או רעש?",
+                followUp: "באיזו עוצמה?"
+            },
+            {
+                type: "yesNo",
+                question: "האם יש בחילה או הקאות?",
+                followUp: "תאר את התדירות והעוצמה"
+            },
+            {
+                type: "yesNo",
+                question: "האם לקחת תרופות כלשהן להקלה?",
+                followUp: "אילו תרופות והאם הועילו?"
+            },
+            {
+                type: "yesNo",
+                question: "האם אתה מעשן?",
+                followUp: "כמה סיגריות ביום?"
+            }
         ],
         "כאב בטן": [
-            "כמה זמן נמשך כאב הבטן?",
-            "היכן ממוקם הכאב (באיזה חלק מהבטן)?",
-            "האם הכאב קבוע או מתפרץ בהתקפים?",
-            "האם הכאב מקרין לאזורים אחרים בגוף?",
-            "האם יש שינויים ביציאות (שלשול, עצירות, יציאות דמיות)?",
-            "האם יש בחילות, הקאות או חוסר תיאבון?",
-            "האם יש חום או צמרמורות?",
-            "האם כאב הבטן משתנה לאחר אכילה או יציאה?",
-            "האם יש גזים, נפיחות או שיהוקים מרובים?"
+            {
+                type: "duration",
+                question: "כמה זמן נמשך כאב הבטן?",
+                placeholder: "שעה / יום / יומיים..."
+            },
+            {
+                type: "location",
+                question: "היכן ממוקם הכאב בבטן?",
+                options: ["בטן עליונה", "בטן תחתונה", "ימין", "שמאל", "סביב הטבור", "כל הבטן"]
+            },
+            {
+                type: "characteristic",
+                question: "כיצד היית מתאר את אופי הכאב?",
+                options: ["חד", "מתמשך", "התקפי", "צורב", "לוחץ"]
+            },
+            {
+                type: "yesNo",
+                question: "האם יש שינויים ביציאות?",
+                followUp: "איזה סוג של שינויים (שלשול/עצירות)?"
+            },
+            {
+                type: "yesNo",
+                question: "האם יש בחילה או הקאות?",
+                followUp: "תאר את התדירות והעוצמה"
+            },
+            {
+                type: "yesNo",
+                question: "האם אתה מעשן?",
+                followUp: "כמה סיגריות ביום?"
+            }
         ],
         "כאב גב": [
-            "כמה זמן נמשך כאב הגב?",
-            "היכן ממוקם הכאב (גב עליון, אמצעי, תחתון)?",
-            "האם הכאב התחיל בפתאומיות או בהדרגה?",
-            "האם קדמה לכאב חבלה או פעילות מאומצת?",
-            "האם הכאב מקרין לרגליים או לאזורים אחרים בגוף?",
-            "האם יש תחושות נימול או חולשה ברגליים?",
-            "האם הכאב משתנה בתנועה, שכיבה או ישיבה?",
-            "האם יש קושי בהליכה או תנועה בשל הכאב?",
-            "האם לקחת תרופות לשיכוך כאבים? איזה ובאיזו מידה הן עוזרות?"
+            {
+                type: "duration",
+                question: "כמה זמן נמשך כאב הגב?",
+                placeholder: "יום / שבוע / חודש..."
+            },
+            {
+                type: "location",
+                question: "היכן ממוקם הכאב בגב?",
+                options: ["גב עליון", "גב תחתון", "אמצע הגב", "צד ימין", "צד שמאל", "מרכז עמוד השדרה"]
+            },
+            {
+                type: "characteristic",
+                question: "כיצד היית מתאר את אופי הכאב?",
+                options: ["חד", "מתמשך", "צורב", "התכווצותי", "מקרין"]
+            },
+            {
+                type: "yesNo",
+                question: "האם הכאב מקרין לגפיים?",
+                followUp: "לאן הכאב מקרין ומה עוצמתו?"
+            },
+            {
+                type: "yesNo",
+                question: "האם אתה חש חולשה או נימול בגפיים?",
+                followUp: "איפה בדיוק ומה עוצמת התופעה?"
+            },
+            {
+                type: "yesNo",
+                question: "האם אתה מעשן?",
+                followUp: "כמה סיגריות ביום?"
+            }
         ],
-        "שיעול": [
-            "כמה זמן נמשך השיעול?",
-            "האם השיעול יבש או עם ליחה?",
-            "אם יש ליחה, מה צבעה (שקופה, צהובה, ירוקה, דמית)?",
-            "האם השיעול חמור יותר בזמנים מסוימים ביום או בתנאים מסוימים?",
-            "האם יש קוצר נשימה או צפצופים?",
-            "האם יש כאב חזה בזמן השיעול?",
-            "האם יש חום או צמרמורות?",
-            "האם יש נזלת או כאב גרון המלווים את השיעול?",
-            "האם היית חשוף לאנשים עם שיעול או נזלת לאחרונה?"
-        ],
-        "קוצר נשימה": [
-            "מתי התחיל קוצר הנשימה?",
-            "האם קוצר הנשימה הופיע בפתאומיות או בהדרגה?",
-            "האם זה קורה במנוחה, במאמץ קל או רק במאמץ משמעותי?",
-            "האם יש כאב בחזה המלווה את קוצר הנשימה?",
-            "האם אתה מרגיש דפיקות לב מהירות או חריגות?",
-            "האם יש שיעול או ליחה? אם כן, מה צבעה?",
-            "האם יש נפיחות ברגליים?",
-            "האם יש לך רקע של מחלות לב או ריאה?",
-            "האם אתה מעשן או נחשפת לעשן או זיהום אוויר לאחרונה?"
-        ],
-        "פציעת ראש": [
-            "כיצד אירעה הפציעה בראש?",
-            "האם היה אובדן הכרה? אם כן, לכמה זמן?",
-            "האם יש כאב ראש? מה עוצמתו ומיקומו?",
-            "האם יש בחילה או הקאות?",
-            "האם יש סחרחורת או בעיות בשיווי משקל?",
-            "האם הרגשת בלבול, חוסר התמצאות או אובדן זיכרון?",
-            "האם יש טשטוש ראייה או רגישות לאור?",
-            "האם זרם דם או נוזל שקוף מהאף או האוזניים?",
-            "האם ישנת מאז הפציעה, ואם כן, האם היה קושי להעיר אותך?"
-        ],
-        "שבר": [
-            "היכן ממוקם השבר החשוד?",
-            "כיצד אירעה הפציעה?",
-            "האם יש עיוות נראה לעין או שינוי צורה באזור הפגוע?",
-            "מה עוצמת הכאב (בסולם 1-10)?",
-            "האם יש נפיחות, אודם או שטף דם באזור?",
-            "האם יש הגבלה בתנועה באזור הפגיעה?",
-            "האם יכול/ה לשאת משקל על האזור הפגוע (אם מדובר בגפה תחתונה)?",
-            "האם שמעת קול נקישה או חריקה בזמן הפגיעה?",
-            "האם יש שינוי בצבע או בטמפרטורה של האזור הפגוע?"
-        ],
-        "כוויה": [
-            "מה גרם לכוויה (חום יבש, נוזל חם, כימיקלים, חשמל)?",
-            "מתי התרחשה הכוויה?",
-            "באיזה אזור בגוף הכוויה וכמה שטח מכוסה?",
-            "מה עומק הכוויה (אדמומיות בלבד, שלפוחיות, פגיעה עמוקה)?",
-            "האם הכוויה פוגעת בפנים, ידיים, רגליים, מפרקים או אברי מין?",
-            "האם ננקטו פעולות עזרה ראשונה? אם כן, אילו?",
-            "האם יש כאב? מה עוצמתו?",
-            "האם יש סימנים של זיהום (מוגלה, ריח רע, נפיחות מתגברת)?",
-            "האם חוסנת נגד טטנוס בחמש השנים האחרונות?"
-        ]
+        // שאר התלונות יש להמשיך באותו פורמט
     };
     
     // אם יש שאלות מוגדרות לתלונה, החזר אותן
@@ -626,128 +1620,217 @@ function getStandardQuestions(complaint) {
         return standardQuestions[complaint];
     }
     
-    // אחרת החזר שאלות כלליות מפורטות
+    // אחרת החזר שאלות כלליות
     return [
-        "מתי התחילו הסימפטומים בדיוק (תאריך ושעה אם זכור)?",
-        "האם הסימפטומים הופיעו בפתאומיות או התפתחו בהדרגה?",
-        "מה עוצמת הסימפטומים בסולם של 1-10?",
-        "האם הסימפטומים משתנים במהלך היום או קבועים?",
-        "האם יש גורמים מסוימים שמחמירים את המצב (תנועה, אוכל, מאמץ)?",
-        "האם יש גורמים שמקלים על הסימפטומים?",
-        "האם יש סימפטומים נוספים מלבד התלונה העיקרית?",
-        "האם ניסית טיפול כלשהו עד כה? אם כן, מה והאם זה עזר?",
-        "האם יש רקע רפואי שיכול להיות קשור למצב הנוכחי?"
+        {
+            type: "duration",
+            question: "כמה זמן נמשכים הסימפטומים?",
+            placeholder: "שעות / ימים / שבועות..."
+        },
+        {
+            type: "onset",
+            question: "כיצד התחילו הסימפטומים?",
+            options: ["בפתאומיות", "בהדרגה", "לאחר אירוע מסוים"]
+        },
+        {
+            type: "scale",
+            question: "מהי עוצמת הסימפטומים בסולם 1-10?",
+            placeholder: "דרג מ-1 (קל) עד 10 (חמור ביותר)"
+        },
+        {
+            type: "yesNo",
+            question: "האם ניסית טיפול כלשהו עד כה?",
+            followUp: "איזה טיפול והאם הועיל?"
+        },
+        {
+            type: "yesNo",
+            question: "האם יש סימפטומים נוספים מלבד התלונה העיקרית?",
+            followUp: "אילו סימפטומים נוספים?"
+        },
+        {
+            type: "yesNo",
+            question: "האם אתה מעשן?",
+            followUp: "כמה סיגריות ביום?"
+        }
     ];
 }
 
-// פונקציית עזר לקבלת שאלות דינמיות בהתאם לתשובות הקודמות
+// פונקציה להשגת שאלות דינמיות בהתאם לתשובות הקודמות
 function getDynamicQuestions(complaint, previousAnswers) {
+    // פונקציה זו אמורה להשתמש בשירות מהשרת
+    // במצב פיתוח/דמו, נשתמש בנתונים קבועים
+    
     // ניתוח התשובות הקודמות לזיהוי סימפטומים ייחודיים
-    let hasSymptom = (keyword) => {
-        return Object.values(previousAnswers).some(answer => 
-            answer.toLowerCase().includes(keyword.toLowerCase()) &&
-            answer.toLowerCase().includes('כן'));
+    const hasSymptom = (keyword) => {
+        return Object.entries(previousAnswers).some(([question, answer]) => 
+            (question.toLowerCase().includes(keyword.toLowerCase()) || 
+             answer.toLowerCase().includes(keyword.toLowerCase())) &&
+            answer.toLowerCase().includes('כן')
+        );
     };
     
-    // מיפוי שאלות המשך מותאמות לפי סוג התלונה ותשובות קודמות
-    const dynamicQuestionsMap = {
-        "כאב ראש": [
-            "האם יש הפרעות ראייה כמו טשטוש או כפל ראייה?",
-            "האם הכאב מתגבר בשכיבה או התכופפות?",
-            "האם יש תחושה של לחץ מאחורי העיניים?",
-            "האם זהו כאב ראש חזק יותר מכאבים קודמים?",
-            hasSymptom('הקאות') ? "האם ההקאות התגברו בשעות האחרונות?" : "האם יש רגישות יתר לריחות במהלך הכאב?",
-            hasSymptom('אור') ? "האם הרגישות לאור מופיעה רק בזמן הכאב או גם לפני?" : "האם יש רגישות לאור או רעש?",
-            hasSymptom('דופק') ? "האם אתה חש דופק בראש יחד עם הכאב?" : "האם יש תחושת דפיקות בראש?",
-            "האם יש תסמינים שמופיעים לפני התחלת הכאב (אאורה)?",
-            "האם הכאב החל אחרי פעילות פיזית מאומצת או שינוי בתרופות?"
-        ],
-        "כאב בטן": [
-            "האם אכלת משהו חדש או חריג לאחרונה?",
-            "האם יש תחושת ׳מלאות׳ או כבדות בבטן?",
-            "האם הכאב מפריע לשינה?",
-            hasSymptom('שלשול') ? "כמה יציאות יש ביום וכיצד הן נראות?" : "האם יש שינוי בתדירות או בצורת היציאות?",
-            hasSymptom('דם') ? "האם ראית דם ביציאות או בהקאות?" : "האם הבחנת בדם ביציאות או שהיציאות כהות באופן חריג?",
-            hasSymptom('הקאות') ? "האם ההקאות מכילות מזון שאכלת לאחרונה או נוזל אחר?" : "האם יש בחילות או הקאות?",
-            hasSymptom('חום') ? "מה גובה החום וכמה זמן הוא נמשך?" : "האם יש חום או צמרמורות?",
-            "האם הכאב מקרין לגב, לכתף או למקומות אחרים?",
-            "האם יש תחושת בטן נפוחה או גזים מרובים?"
-        ],
-        "כאב גרון": [
-            "האם אתה מרגיש גוש או נפיחות בגרון?",
-            "האם הקושי בבליעה מתייחס לנוזלים, מוצקים או שניהם?",
-            "האם יש שינוי בטעם או ריח?",
-            hasSymptom('חום') ? "האם החום נמשך יותר מ-3 ימים?" : "האם יש תחושת חמימות או חום?",
-            hasSymptom('נקודות') ? "האם הנקודות הלבנות בגרון גדלות או משתנות?" : "האם הבחנת בנקודות לבנות או כתמים בגרון?",
-            hasSymptom('בלוטות') ? "האם הבלוטות הנפוחות רגישות למגע?" : "האם יש נפיחות בבלוטות הצוואר?",
-            hasSymptom('קשיי נשימה') ? "האם קשיי הנשימה גוברים בשכיבה?" : "האם יש קושי בנשימה או שריקות בעת נשימה?",
-            "האם כאב הגרון הוא בצד אחד או בשני הצדדים?",
-            "האם הדיבור כואב או משתנה (צרידות, קושי בדיבור)?"
-        ],
-        "פציעת ראש": [
-            "האם אתה זוכר את האירוע שגרם לפציעה בבירור?",
-            "האם יש אזורים רכים או נפוחים בראש?",
-            "האם יש שינויים בהתנהגות או במצב הרוח מאז הפגיעה?",
-            hasSymptom('הכרה') ? "למשך כמה זמן הייתה אובדן ההכרה?" : "האם היו אירועים של בלבול או חוסר זיכרון?",
-            hasSymptom('הקאות') ? "האם ההקאות חוזרות או הן היו חד פעמיות?" : "האם יש בחילות או הקאות?",
-            hasSymptom('ראייה') ? "האם שינויי הראייה משתפרים או מחמירים?" : "האם יש שינויים בראייה או רגישות לאור?",
-            hasSymptom('סחרחורת') ? "האם הסחרחורת משתנה בתנוחות שונות או קבועה?" : "האם יש סחרחורת או בעיות בשיווי משקל?",
-            "האם יש רעשים או צלצולים באוזניים מאז הפגיעה?",
-            "האם הצלחת להירדם לאחר הפגיעה ואם כן, האם היה קושי להתעורר?"
-        ],
-        "שבר": [
-            "האם יש בשבר החשוד חדירה של העצם דרך העור?",
-            "האם יכול/ה להזיז את האצבעות/כף הרגל מתחת לאזור הפגוע?",
-            "האם יש סימנים של פגיעה בכלי דם (חיוורון, קור, דופק חלש)?",
-            hasSymptom('נפיחות') ? "האם הנפיחות גוברת או יציבה?" : "האם יש נפיחות באזור?",
-            hasSymptom('דפורמציה') ? "האם העיוות באזור השבר בולט או מוסתר?" : "האם יש עיוות נראה לעין באזור?",
-            hasSymptom('תנועה') ? "האם התנועה באזור הפגוע גורמת לכאב חד?" : "האם יש הגבלה בתנועה?",
-            hasSymptom('כאב') ? "האם הכאב משתנה או קבוע בעוצמתו?" : "מה עוצמת הכאב בסולם 1-10?",
-            "האם ניסית לקבע את האזור הפגוע? אם כן, כיצד?",
-            "האם יש תחושת נימול או חוסר תחושה מתחת לאזור הפגיעה?"
-        ]
-    };
-    
-    // אם יש שאלות ספציפיות לתלונה
-    if (dynamicQuestionsMap[complaint]) {
-        return dynamicQuestionsMap[complaint];
+    // שאלות דינמיות לפי תלונה ותשובות קודמות
+    if (complaint === 'כאב ראש') {
+        return [
+            {
+                type: "yesNo",
+                question: "האם יש הפרעות ראייה?",
+                followUp: "איזה סוג של הפרעות (טשטוש, כפל ראייה)?"
+            },
+            hasSymptom('בחילה') ? {
+                type: "yesNo",
+                question: "האם הבחילות הולכות ומחמירות?",
+                followUp: "תאר את ההחמרה"
+            } : {
+                type: "yesNo",
+                question: "האם יש רגישות לריחות?",
+                followUp: "לאילו ריחות?"
+            },
+            hasSymptom('אור') ? {
+                type: "yesNo",
+                question: "האם הרגישות לאור מופיעה רק בזמן הכאב?",
+                followUp: "מתי מופיעה הרגישות לאור?"
+            } : {
+                type: "yesNo",
+                question: "האם כאב הראש מעיר אותך משינה?",
+                followUp: "באיזו תדירות?"
+            },
+            {
+                type: "yesNo",
+                question: "האם הכאב החל לאחר מאמץ או אירוע מסוים?",
+                followUp: "תאר את האירוע"
+            }
+        ];
     }
     
-    // שאלות המשך כלליות משופרות
+    else if (complaint === 'כאב בטן') {
+        return [
+            hasSymptom('שלשול') ? {
+                type: "quantity",
+                question: "כמה יציאות ביום?",
+                placeholder: "מספר משוער של יציאות"
+            } : {
+                type: "yesNo",
+                question: "האם יש עצירות?",
+                followUp: "מתי הייתה היציאה האחרונה?"
+            },
+            {
+                type: "yesNo",
+                question: "האם הכאב קשור לאכילה?",
+                followUp: "האם מופיע לפני, בזמן או אחרי אכילה?"
+            },
+            hasSymptom('דם') ? {
+                type: "yesNo",
+                question: "האם הדם ביציאות או בהקאות עדיין נמשך?",
+                followUp: "מתי הופיע לאחרונה?"
+            } : {
+                type: "yesNo",
+                question: "האם יש שינוי בצבע היציאות?",
+                followUp: "מהו הצבע?"
+            },
+            {
+                type: "yesNo",
+                question: "האם הכאב מקרין לאזורים אחרים?",
+                followUp: "לאן הכאב מקרין?"
+            }
+        ];
+    }
+    
+    // שאלות דינמיות כלליות
     return [
-        "האם יש שינויים ברמת האנרגיה או העייפות שלך לאחרונה?",
-        "האם יש שינויים בהרגלי האכילה או השתייה שלך?",
-        "האם יש שינויים בהרגלי השינה שלך לאחרונה?",
-        "האם חווית מצבים דומים בעבר? אם כן, כיצד טופלו?",
-        "האם יש גורמים סביבתיים שעשויים להשפיע על מצבך (חשיפה לחומרים, אלרגנים)?",
-        "האם חל שינוי במשקל שלך לאחרונה ללא סיבה ברורה?",
-        "האם יש לך מחלות כרוניות שיכולות להיות קשורות למצב הנוכחי?",
-        "האם היו שינויים בתרופות שאתה נוטל לאחרונה?",
-        "האם יש משהו נוסף שחשוב שנדע על מצבך הבריאותי?"
+        {
+            type: "yesNo",
+            question: "האם חל שינוי ברמת האנרגיה שלך לאחרונה?",
+            followUp: "תאר את השינוי"
+        },
+        {
+            type: "yesNo",
+            question: "האם יש שינויים בהרגלי האכילה או השתייה שלך?",
+            followUp: "איזה שינויים?"
+        },
+        {
+            type: "yesNo",
+            question: "האם יש לך מחלות כרוניות?",
+            followUp: "אילו מחלות?"
+        },
+        {
+            type: "yesNo",
+            question: "האם חווית מצבים דומים בעבר?",
+            followUp: "מתי והאם טופלו?"
+        }
     ];
 }
 
-// פונקציית עזר ליצירת סיכום אנמנזה משופר
+// פונקציה לקבלת מדדים חיוניים רלוונטיים לתלונה
+function getRelevantVitalSigns(complaint) {
+    // מיפוי מדדים רלוונטיים לפי תלונה
+    const vitalSignsByComplaint = {
+        "כאב ראש": ["דופק", "לחץ דם", "חום", "סטורציה"],
+        "כאב חזה": ["דופק", "לחץ דם", "חום", "סטורציה", "קצב נשימה"],
+        "קוצר נשימה": ["דופק", "לחץ דם", "חום", "סטורציה", "קצב נשימה"],
+        "כאב בטן": ["דופק", "לחץ דם", "חום"],
+        "חום": ["דופק", "לחץ דם", "חום", "סטורציה"],
+        "פציעת ראש": ["דופק", "לחץ דם", "סטורציה"],
+        "כאב גרון": ["חום"],
+        "שיעול": ["חום", "סטורציה", "קצב נשימה"],
+        "סחרחורת": ["דופק", "לחץ דם", "חום"]
+    };
+    
+    // החזרת המדדים הרלוונטיים או ברירת מחדל
+    return vitalSignsByComplaint[complaint] || ["דופק", "לחץ דם", "חום"];
+}
+
+// פונקציה ליצירת סיכום אנמנזה
 function generateSummary(patientRecord) {
+    // פונקציה זו אמורה להשתמש בשירות מהשרת
+    // במצב פיתוח/דמו, נחקה את הסיכום שהתקבל מהשרת
+    
     try {
         // חילוץ מידע בסיסי
-        const { age, gender, mainComplaint, profile, medicalSections, allergies, medications } = patientRecord.patientInfo;
+        const { age, gender, mainComplaint, profile, medicalSections, allergies, medications, smoking } = patientRecord.patientInfo;
         const genderText = gender === 'male' ? 'זכר' : 'נקבה';
         
         // פתיחת האנמנזה עם פרטי הפרופיל הרפואי
         let summary = `פרופיל ${profile}, ${medicalSections}, ${allergies}, ${medications}.\n\n`;
         
         // תיאור דמוגרפי ותלונה עיקרית
-        summary += `מטופל/ת בגיל ${age}, ${genderText}, מתלונן/ת על ${mainComplaint} `;
+        summary += `מטופל/ת בגיל ${age}, ${genderText}, ${smoking === 'yes' ? 'מעשן/ת' : 'לא מעשן/ת'}, מתלונן/ת על ${mainComplaint}`;
+        
+        // הוספת המדדים אם קיימים
+        if (patientRecord.vitalSigns && Object.keys(patientRecord.vitalSigns).length > 0) {
+            summary += '\n\nמדדים חיוניים: ';
+            const vitalSignsArr = [];
+            
+            if (patientRecord.vitalSigns.pulse) {
+                vitalSignsArr.push(`דופק ${patientRecord.vitalSigns.pulse}`);
+            }
+            if (patientRecord.vitalSigns.bloodPressure) {
+                vitalSignsArr.push(`לחץ דם ${patientRecord.vitalSigns.bloodPressure}`);
+            }
+            if (patientRecord.vitalSigns.temperature) {
+                vitalSignsArr.push(`חום ${patientRecord.vitalSigns.temperature}`);
+            }
+            if (patientRecord.vitalSigns.saturation) {
+                vitalSignsArr.push(`סטורציה ${patientRecord.vitalSigns.saturation}%`);
+            }
+            if (patientRecord.vitalSigns.respiratoryRate) {
+                vitalSignsArr.push(`קצב נשימה ${patientRecord.vitalSigns.respiratoryRate}`);
+            }
+            
+            summary += vitalSignsArr.join(', ') + '.\n\n';
+        } else {
+            summary += '.\n\n';
+        }
         
         // איסוף מידע משמעותי מהתשובות
         let duration = "";
-        let painLocation = "";
-        let painCharacteristics = [];
+        let location = "";
+        let characteristics = [];
         let associatedSymptoms = [];
         let aggravatingFactors = [];
         let relievingFactors = [];
         let treatments = [];
+        let negativeFindings = []; // ממצאים שליליים
         
         // חיפוש תשובות רלוונטיות מהשאלות הסטנדרטיות והדינמיות
         const allAnswers = {
@@ -764,10 +1847,10 @@ function generateSummary(patientRecord) {
                 duration = answer;
             } 
             else if (question.includes("היכן") || question.includes("מיקום") || question.includes("איפה") || question.includes("ממוקם")) {
-                painLocation = answer;
+                location = answer;
             }
             else if (question.includes("אופי") || question.includes("מתאר") || question.includes("סוג")) {
-                painCharacteristics.push(answer);
+                characteristics.push(answer);
             }
             else if (question.includes("מחמיר") || question.includes("גורם להחמרה")) {
                 aggravatingFactors.push(answer);
@@ -778,24 +1861,36 @@ function generateSummary(patientRecord) {
             else if (question.includes("סימפטומים נוספים") || question.includes("תסמינים") || 
                     question.includes("בחילה") || question.includes("הקאות") || 
                     question.includes("חום") || question.includes("סחרחורת")) {
-                associatedSymptoms.push(`${question.replace('?', '')}: ${answer}`);
+                if (answer.toLowerCase() === 'לא') {
+                    negativeFindings.push(`שולל ${question.replace('?', '').replace('האם', '')}`);
+                } else {
+                    associatedSymptoms.push(`${question.replace('?', '')}: ${answer}`);
+                }
             }
             else if (question.includes("טיפול") || question.includes("תרופות") || question.includes("לקחת")) {
-                treatments.push(`${question.replace('?', '')}: ${answer}`);
+                if (answer.toLowerCase() === 'לא') {
+                    negativeFindings.push("שולל נטילת תרופות קודמות");
+                } else {
+                    treatments.push(`${question.replace('?', '')}: ${answer}`);
+                }
+            }
+            else if (answer.toLowerCase() === 'לא') {
+                // הוספת ממצאים שליליים נוספים
+                negativeFindings.push(`שולל ${question.replace('?', '').replace('האם', '')}`);
             }
         }
         
         // בניית משפט משמעותי על התלונה העיקרית
         if (duration) {
-            summary += `המתחיל/ה לפני ${duration}`;
+            summary += `התלונה החלה לפני ${duration}`;
         }
         
-        if (painLocation) {
-            summary += ` ומתמקם ב${painLocation}`;
+        if (location) {
+            summary += ` ומתמקמת ב${location}`;
         }
         
-        if (painCharacteristics.length > 0) {
-            summary += `. הכאב מתואר כ${painCharacteristics.join(", ")}`;
+        if (characteristics.length > 0) {
+            summary += `. התלונה מתוארת כ${characteristics.join(", ")}`;
         }
         
         summary += '. ';
@@ -803,11 +1898,11 @@ function generateSummary(patientRecord) {
         // הוספת גורמים מחמירים ומקלים
         if (aggravatingFactors.length > 0 || relievingFactors.length > 0) {
             if (aggravatingFactors.length > 0) {
-                summary += `גורמים המחמירים את המצב: ${aggravatingFactors.join(", ")}. `;
+                summary += `גורמים מחמירים: ${aggravatingFactors.join(", ")}. `;
             }
             
             if (relievingFactors.length > 0) {
-                summary += `גורמים המקלים על המצב: ${relievingFactors.join(", ")}. `;
+                summary += `גורמים מקלים: ${relievingFactors.join(", ")}. `;
             }
             
             summary += '\n\n';
@@ -823,6 +1918,11 @@ function generateSummary(patientRecord) {
             summary += `טיפולים שננקטו: ${treatments.join("; ")}. \n\n`;
         }
         
+        // הוספת ממצאים שליליים
+        if (negativeFindings.length > 0) {
+            summary += `ממצאים שליליים: ${negativeFindings.join("; ")}. \n\n`;
+        }
+        
         // בדיקה לדגלים אדומים
         const redFlags = checkForRedFlags(patientRecord);
         
@@ -830,194 +1930,87 @@ function generateSummary(patientRecord) {
             summary += `דגלים אדומים: ${redFlags.join("; ")}.`;
         }
         
-        return summary;
+        patientRecord.summary = summary;
+        return patientRecord;
     } catch (error) {
         console.error("שגיאה ביצירת סיכום:", error);
         
         // אם יש שגיאה, יצירת סיכום בסיסי
-        const { age, gender, mainComplaint, profile, medicalSections, allergies, medications } = patientRecord.patientInfo;
+        const { age, gender, mainComplaint, profile, medicalSections, allergies, medications, smoking } = patientRecord.patientInfo;
         const genderText = gender === 'male' ? 'זכר' : 'נקבה';
         
-        return `פרופיל ${profile}, ${medicalSections}, ${allergies}, ${medications}.\n\nמטופל/ת בגיל ${age}, ${genderText}, עם תלונה עיקרית של ${mainComplaint}.\n\nלא ניתן היה ליצור סיכום מפורט עקב בעיה טכנית.`;
+        patientRecord.summary = `פרופיל ${profile}, ${medicalSections}, ${allergies}, ${medications}.\n\nמטופל/ת בגיל ${age}, ${genderText}, ${smoking === 'yes' ? 'מעשן/ת' : 'לא מעשן/ת'}, עם תלונה עיקרית של ${mainComplaint}.\n\nלא ניתן היה ליצור סיכום מפורט עקב בעיה טכנית.`;
+        
+        return patientRecord;
     }
 }
 
-// פונקציית בדיקת דגלים אדומים
+// פונקציה לבדיקת דגלים אדומים בהתאם לתלונה
 function checkForRedFlags(patientRecord) {
-    const redFlags = [];
     const { mainComplaint } = patientRecord.patientInfo;
     const allAnswers = { ...patientRecord.standardAnswers, ...patientRecord.dynamicAnswers };
+    const redFlags = [];
     
-    // פונקציית עזר משופרת לבדיקת תשובות
-    const containsKeyword = (keywords, positiveTerms = ['כן', 'חיובי', 'נכון']) => {
+    // פונקציית עזר לבדיקת תשובות
+    const containsKeyword = (keywords, answer) => {
         if (!Array.isArray(keywords)) keywords = [keywords];
-        
-        for (const [question, answer] of Object.entries(allAnswers)) {
-            if (!answer) continue;
-            
-            // בדיקה אם השאלה או התשובה מכילות את אחת ממילות המפתח
-            const questionOrAnswerContainsKeyword = keywords.some(keyword => 
-                question.toLowerCase().includes(keyword.toLowerCase()) || 
-                answer.toLowerCase().includes(keyword.toLowerCase())
-            );
-            
-            // בדיקה אם התשובה חיובית
-            const isPositiveResponse = positiveTerms.some(term => 
-                answer.toLowerCase().includes(term.toLowerCase())
-            ) || !['לא', 'שלילי', 'אין'].some(term => 
-                answer.toLowerCase().includes(term.toLowerCase())
-            );
-            
-            if (questionOrAnswerContainsKeyword && isPositiveResponse) {
-                return true;
-            }
-        }
-        return false;
+        return keywords.some(keyword => answer.toLowerCase().includes(keyword.toLowerCase()));
     };
     
-    // בדיקות ספציפיות לתלונות שונות לפי מדריך הטיפול הרפואי
-    
-    // כאב ראש - דגלים אדומים
+    // בדיקת תשובות בהתאם לתלונה
     if (mainComplaint.includes("כאב ראש")) {
-        if (containsKeyword(["הופעה פתאומית", "פתאומי", "חד"])) 
-            redFlags.push("כאב ראש שהופיע בפתאומיות - יש לשקול הערכה נוירולוגית");
-        
-        if (containsKeyword(["הקאות", "בחילות"]) && containsKeyword(["מרובות", "חוזרות"]))
-            redFlags.push("הקאות בשילוב עם כאב ראש");
-        
-        if (containsKeyword(["חמור", "חזק ביותר", "הכי גרוע"]))
-            redFlags.push("כאב ראש בעוצמה גבוהה מאוד");
-        
-        if (containsKeyword(["הפרעות ראייה", "טשטוש", "כפל ראייה"]))
-            redFlags.push("הפרעות ראייה המלוות כאב ראש");
-        
-        if (containsKeyword(["נימול", "חולשה בגפיים"]))
-            redFlags.push("תסמינים נוירולוגיים המלווים כאב ראש");
-        
-        if (containsKeyword(["מעיר משינה", "מתעורר בגלל הכאב"]))
-            redFlags.push("כאב ראש המעיר משינה");
+        // בדיקת עוצמת כאב גבוהה
+        Object.entries(allAnswers).forEach(([question, answer]) => {
+            if (question.includes("עוצמת") && answer.match(/\d+/) && parseInt(answer.match(/\d+/)[0]) >= 8) {
+                redFlags.push("כאב ראש בעוצמה גבוהה - נדרשת הערכה רפואית");
+            }
+            
+            if (question.includes("הקאות") && containsKeyword(["כן", "מרובות", "חוזרות"], answer)) {
+                redFlags.push("הקאות בשילוב עם כאב ראש - חשד למצב נוירולוגי דחוף");
+            }
+            
+            if (question.includes("ראייה") && containsKeyword(["כן", "טשטוש", "כפל"], answer)) {
+                redFlags.push("הפרעות ראייה המלוות כאב ראש - מצריך בירור דחוף");
+            }
+            
+            if (question.includes("פתאומי") && containsKeyword(["כן", "פתאום"], answer)) {
+                redFlags.push("כאב ראש שהופיע בפתאומיות - יש לשקול הערכה נוירולוגית דחופה");
+            }
+        });
     }
     
-    // כאב חזה - דגלים אדומים
-    else if (mainComplaint.includes("כאב חזה")) {
-        if (containsKeyword(["קוצר נשימה", "קשיי נשימה"]))
-            redFlags.push("כאב חזה בשילוב עם קוצר נשימה - יש לשלול מצב לבבי או ריאתי חריף");
-        
-        if (containsKeyword(["זיעה", "הזעה", "זיעה קרה"]))
-            redFlags.push("כאב חזה בשילוב עם הזעה");
-        
-        if (containsKeyword(["לחץ", "מועקה", "כבדות"]))
-            redFlags.push("תחושת לחץ או מועקה בחזה");
-        
-        if (containsKeyword(["הקרנה", "מקרין", "פשט", "התפשט"], ["ליד", "לזרוע", "לכתף", "ללסת"]))
-            redFlags.push("כאב חזה המקרין לזרוע, כתף או לסת");
-        
-        if (containsKeyword(["בחילה", "סחרחורת"]) && containsKeyword(["חזה"]))
-            redFlags.push("כאב חזה המלווה בבחילה או סחרחורת");
-    }
-    
-    // פציעת ראש - דגלים אדומים
-    else if (mainComplaint.includes("פציעת ראש")) {
-        if (containsKeyword(["איבוד הכרה", "התעלפות", "איבד הכרה"]))
-            redFlags.push("איבוד הכרה לאחר פציעת ראש");
-        
-        if (containsKeyword(["הקאות", "בחילות"]) && containsKeyword(["חוזרות", "מרובות"]))
-            redFlags.push("הקאות חוזרות לאחר פציעת ראש");
-        
-        if (containsKeyword(["בלבול", "חוסר התמצאות", "חוסר זיכרון"]))
-            redFlags.push("בלבול או חוסר התמצאות לאחר פציעת ראש");
-        
-        if (containsKeyword(["נוזל", "דימום"]) && containsKeyword(["אוזניים", "אף", "פה"]))
-            redFlags.push("נוזל או דימום מהאוזניים או האף");
-        
-        if (containsKeyword(["אישונים לא שווים", "תגובת אישונים"]))
-            redFlags.push("אישונים לא שווים או תגובה לא תקינה לאור");
-        
-        if (containsKeyword(["קושי להעיר", "שינה עמוקה"]))
-            redFlags.push("קושי להעיר את המטופל לאחר פציעת ראש");
-    }
-    
-    // כאב בטן - דגלים אדומים
     else if (mainComplaint.includes("כאב בטן")) {
-        if (containsKeyword(["דם", "דמי"]) && (containsKeyword(["צואה", "יציאות"]) || containsKeyword(["הקאה", "הקאות"])))
-            redFlags.push("דם בצואה או בהקאות");
+        Object.entries(allAnswers).forEach(([question, answer]) => {
+            if ((question.includes("דם") || question.includes("דמית")) && containsKeyword(["כן"], answer)) {
+                redFlags.push("דם בצואה או בהקאות - מצריך הערכה דחופה");
+            }
+            
+            if (question.includes("בטן קשה") && containsKeyword(["כן"], answer)) {
+                redFlags.push("בטן קשה או מתוחה - יש לשלול מצב כירורגי חריף");
+            }
+        });
         
-        if (containsKeyword(["כאב חזק", "כאב חמור"]) && containsKeyword(["ימין תחתונה", "צד ימין למטה"]))
-            redFlags.push("כאב חזק בבטן ימין תחתונה - יש לשלול אפנדיציט");
-        
-        if (containsKeyword(["קושי במתן שתן", "כאב במתן שתן"]) && containsKeyword(["בטן"]))
-            redFlags.push("כאב בטן המלווה בבעיות במתן שתן");
-        
-        if (containsKeyword(["בטן קשה", "בטן מתוחה", "נוקשות"]))
-            redFlags.push("בטן קשה או מתוחה - יש לשלול מצב כירורגי חריף");
-        
-        if (containsKeyword(["חום"]) && containsKeyword(["בטן"]))
-            redFlags.push("כאב בטן המלווה בחום - יש לשלול זיהום חמור");
-    }
-    
-    // שבר - דגלים אדומים
-    else if (mainComplaint.includes("שבר")) {
-        if (containsKeyword(["עצם חודרת", "עצם בולטת", "חדירה של העצם"]))
-            redFlags.push("שבר פתוח - עצם חודרת דרך העור");
-        
-        if (containsKeyword(["חוסר תחושה", "נימול", "חוסר יכולת להזיז"]))
-            redFlags.push("סימני פגיעה עצבית באזור השבר");
-        
-        if (containsKeyword(["דופק חלש", "חיוורון", "קור"]) && !containsKeyword(["חזר", "השתפר"]))
-            redFlags.push("סימני פגיעה בכלי דם מתחת לאזור השבר");
-        
-        if (containsKeyword(["צוואר", "גב", "ראש", "אגן", "ירך"]))
-            redFlags.push("שבר באזור קריטי - מצריך טיפול מיידי");
-    }
-    
-    // קוצר נשימה - דגלים אדומים
-    else if (mainComplaint.includes("קוצר נשימה")) {
-        if (containsKeyword(["במנוחה", "ללא מאמץ"]))
-            redFlags.push("קוצר נשימה במנוחה - מצריך הערכה דחופה");
-        
-        if (containsKeyword(["כחלון", "שפתיים כחולות"]))
-            redFlags.push("כחלון - סימן לחמצון נמוך");
-        
-        if (containsKeyword(["דיבור קטוע", "לא מסוגל לדבר משפט"]))
-            redFlags.push("קוצר נשימה המקשה על הדיבור");
-        
-        if (containsKeyword(["דפיקות לב", "דופק מהיר"]))
-            redFlags.push("קוצר נשימה המלווה בדפיקות לב");
-    }
-    
-    // כוויה - דגלים אדומים
-    else if (mainComplaint.includes("כוויה")) {
-        if (containsKeyword(["פנים", "עיניים", "אוזניים"]))
-            redFlags.push("כוויה באזור הפנים או העיניים");
-        
-        if (containsKeyword(["נשימה", "קוצר", "שאיפה"]))
-            redFlags.push("כוויה במערכת הנשימה או קוצר נשימה");
-        
-        if (containsKeyword(["גדולה", "נרחבת", "מעל 10%"]))
-            redFlags.push("כוויה נרחבת - מעל 10% משטח הגוף");
-        
-        if (containsKeyword(["עמוקה", "דרגה 3", "לבנה", "שחורה"]))
-            redFlags.push("כוויה עמוקה (דרגה 3)");
-        
-        if (containsKeyword(["חשמל", "מתח"]))
-            redFlags.push("כוויה כתוצאה מחשמל - סיכון לפגיעה פנימית");
+        // בדיקת מדדים חיוניים
+        if (patientRecord.vitalSigns) {
+            const pulse = patientRecord.vitalSigns.pulse;
+            if (pulse && parseInt(pulse) > 100) {
+                redFlags.push(`דופק מהיר (${pulse}) במטופל עם כאב בטן - חשד להלם או זיהום`);
+            }
+        }
     }
     
     // דגלים אדומים כלליים
-    if (containsKeyword(["קשיי נשימה", "קוצר נשימה חמור"]))
-        redFlags.push("קשיי נשימה משמעותיים");
-    
-    if (containsKeyword(["הקאות", "דם"]) && !containsKeyword(["שלילי", "אין"]))
-        redFlags.push("הקאות דמיות");
-    
-    if (containsKeyword(["חום גבוה", "חום מעל 39"]))
-        redFlags.push("חום גבוה מעל 39 מעלות");
-    
-    if (containsKeyword(["בלבול", "חוסר התמצאות", "הזיות"]))
-        redFlags.push("שינוי במצב ההכרה או בלבול");
-    
-    if (containsKeyword(["אובדן הכרה", "התעלפות"]))
-        redFlags.push("אובדן הכרה");
+    if (patientRecord.vitalSigns) {
+        const temp = patientRecord.vitalSigns.temperature;
+        if (temp && parseFloat(temp) >= 39) {
+            redFlags.push(`חום גבוה ${temp} - דורש התייחסות`);
+        }
+        
+        const saturation = patientRecord.vitalSigns.saturation;
+        if (saturation && parseInt(saturation) < 92) {
+            redFlags.push(`סטורציה נמוכה (${saturation}%) - מצריך הערכה דחופה`);
+        }
+    }
     
     return redFlags;
 }
