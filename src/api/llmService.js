@@ -45,7 +45,7 @@ const LLMService = {
       console.log('בודק חיבור ל-OpenAI API...');
       const response = await axios.get('https://api.openai.com/v1/models', {
         headers: {
-          'Authorization': `Bearer ${this.config.apiKey}`
+          'Authorization': `Bearer ${this.config.apiKey}`,
         },
         timeout: this.config.timeout
       });
@@ -62,52 +62,7 @@ const LLMService = {
       return false;
     }
   },
-// הוסף פונקציות אלו בקובץ src/api/llmService.js
-  /**
-   * קבלת מודלים זמינים מ-OpenAI API
-   * @returns {Promise<Array>} - רשימת המודלים הזמינים
-   */
-  getAvailableModels: async function() {
-    try {
-      if (process.env.NODE_ENV === 'production' || process.env.USE_OPENAI_API === 'true') {
-        const response = await axios.get('https://api.openai.com/v1/models', {
-          headers: {
-            'Authorization': `Bearer ${this.config.apiKey}`
-          },
-          timeout: this.config.timeout
-        });
-        
-        return response.data.data.map(model => ({
-          id: model.id,
-          name: model.id.split(':')[0],
-          created: model.created
-        }));
-      } else {
-        // במצב פיתוח מחזיר רשימה קבועה של מודלים
-        return [
-          { id: 'gpt-3.5-turbo', name: 'GPT-3.5 Turbo', created: Date.now() },
-          { id: 'gpt-4', name: 'GPT-4', created: Date.now() }
-        ];
-      }
-    } catch (error) {
-      console.error('שגיאה בקבלת מודלים זמינים:', error.message);
-      throw new Error('לא ניתן לקבל רשימת מודלים זמינים');
-    }
-  },
 
-  /**
-   * ניקוי המטמון של תשובות המודל
-   * @returns {Promise<void>}
-   */
-  clearCache: async function() {
-    try {
-      await cache.clear();
-      console.log('המטמון נוקה בהצלחה');
-    } catch (error) {
-      console.error('שגיאה בניקוי המטמון:', error.message);
-      throw error;
-    }
-  }
   /**
    * שליחת פרומפט למודל השפה
    * @param {string} prompt - הפרומפט לשליחה למודל
@@ -664,5 +619,4 @@ const LLMService = {
       }
     }
   }}
-
   

@@ -42,14 +42,14 @@ const LLMService = {
    * @returns {Promise<boolean>} - האם יש חיבור תקין
    */
   testApiConnection: async function() {
-    
     try {
-        return await openaiClient.testConnection();
-      } catch (error) {
-        console.error('שגיאה בבדיקת חיבור:', error.message);
-        return false;
-      }
-  },
+      return await openaiClient.testConnection();
+    } catch (error) {
+      console.error('שגיאה בבדיקת חיבור:', error.message);
+      return false;
+    }
+  }, 
+  
 
   /**
    * קבלת מודלים זמינים מ-OpenAI API
@@ -104,6 +104,7 @@ const LLMService = {
    * @returns {Promise<string>} - התשובה מהמודל
    */
   sendPrompt: async function(prompt, options = {}) {
+
     const cacheKey = prompt + JSON.stringify(options);
     
     // בדיקה במטמון אם המטמון מופעל
@@ -116,7 +117,7 @@ const LLMService = {
     }
     
     try {
-      console.log(`שולח בקשה למודל שפה עם פרומפט: ${prompt.substring(0, 100)}...`);
+        console.log(`שולח בקשה למודל שפה עם פרומפט: ${prompt.substring(0, 100)}...`);
       
       // הגדרות ברירת מחדל
       const finalOptions = {
