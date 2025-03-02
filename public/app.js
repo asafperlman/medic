@@ -186,6 +186,7 @@ function checkServerConnection() {
  * אוסף את המידע הנוכחי מהטופס
  * @returns {object} - המידע הנוכחי מהטופס
  */
+
 function collectCurrentFormData() {
   // איסוף מידע ספציפי לכל שלב
   switch (state.currentStep) {
@@ -3356,164 +3357,74 @@ function getStandardQuestions(complaint) {
 }
 
 /**
- * קבלת שאלות דינמיות - מותאמות אישית לפי התשובות הקודמות
- * @param {string} complaint - התלונה העיקרית
- * @param {object} previousAnswers - תשובות קודמות לשאלות
- * @returns {Array} - מערך שאלות דינמיות
- */
-/**
- * קבלת שאלות דינמיות - מותאמות אישית לפי התשובות הקודמות
- * @param {string} complaint - התלונה העיקרית
- * @param {object} previousAnswers - תשובות קודמות לשאלות
- * @returns {Promise<Array>} - מערך שאלות דינמיות (א-סינכרוני!).
- */
-
-/**
- * קריאה אמיתית ל-OpenAI API כדי לנסות להפיק שאלות המשך דינמיות
- * על בסיס תשובות המשתמש בשלב 2.
- * כדי למנוע בעיות אבטחה, מומלץ להריץ בצד שרת (Node.js),
- * ולא לחשוף מפתח API בצד הלקוח.
- */
-/**
- * פונקציה זו פונה ישירות ל-OpenAI API מתוך הדפדפן (צד לקוח),
- * ומבקשת 3-5 שאלות המשך בעברית על סמך התלונה והתשובות הקודמות.
- * שים לב שעליך להחליף את הטקסט "YOUR_OPENAI_API_KEY" במפתח אמיתי.
- */
-async function getDynamicQuestionsFromChatGPT(complaint, previousAnswers) {
-    try {
-      const apiKey = window.OPENAI_API_KEY;
-      
-      if (!apiKey) {
-        console.error("מפתח API לא מוגדר!");
-        return [];
-      }
-  
-      const prompt = `
-        התלונה העיקרית של המטופל/ת: "${complaint}"
-        
-        התשובות הקודמות שניתנו הן:
-        ${JSON.stringify(previousAnswers, null, 2)}
-        
-        אנא צור/י 3 עד 5 שאלות המשך רפואיות נוספות, רלוונטיות וממוקדות,
-        בעברית. כתוב/י כל שאלה בשורה חדשה, ללא מספור וללא פרטים נוספים.
-      `.trim();
-  
-      const response = await fetch('https://api.openai.com/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${apiKey}`
-        },
-        body: JSON.stringify({
-          model: 'gpt-3.5-turbo',
-          messages: [{ role: 'user', content: prompt }],
-          temperature: 0.7
-        })
-      });
-  
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(`שגיאת API: ${response.status} - ${errorData.error?.message || response.statusText}`);
-      }
-  
-      const data = await response.json();
-      const content = data.choices[0].message.content;
-  
-      const lines = content
-        .split('\n')
-        .map(line => line.trim())
-        .filter(Boolean)
-        .filter(line => line.endsWith('?'));
-  
-      return lines.map(question => ({
-        type: 'multiline',
-        question: question
-      }));
-      
-    } catch (error) {
-      console.error('ChatGPT API error:', error);
-      return [];
-    }
-  }
-  /**
-   * פונקציה שמחזירה "שאלות דינמיות" משולבות:
-   * 1. שאלות "סטטיות" ממפה קיימת (ע"פ complaint ותשובות קודמות)
-   * 2. שאלות ChatGPT (ע"י קריאה ל-getDynamicQuestionsFromChatGPT)
-   */
-  // 2. עדכן את קוד צד הלקוח בקובץ public/app.js
-// החלף את פונקציית getDynamicQuestions המקורית:
-
-/**
- * פונקציה לקבלת שאלות דינמיות מהשרת
- * @param {string} complaint - התלונה העיקרית
- * @param {object} previousAnswers - תשובות קודמות
- * @returns {Promise<Array>} - מערך של שאלות דינמיות
- */
-/**
- * פונקציה לקבלת שאלות דינמיות מהשרת
- * @param {string} complaint - התלונה העיקרית
- * @param {object} previousAnswers - תשובות קודמות
- * @returns {Promise<Array>} - מערך של שאלות דינמיות
+ * קבלת שאלות דינמיות מותאמות אישית לפי התלונה העיקרית והתשובות הקודמות
+ * @param {string} complaint - התלונה העיקרית של המטופל
+ * @param {object} previousAnswers - תשובות קודמות לשאלות הסטנדרטיות
+ * @returns {Promise<Array>} - מערך שאלות דינמיות
  */
 async function getDynamicQuestions(complaint, previousAnswers) {
-    // 1. קבלת שאלות מקומיות
+    // קבלת שאלות מהמאגר המקומי
     const localQuestions = getLocalDynamicQuestions(complaint, previousAnswers);
     
+    // בדיקה אם ניתן לבקש שאלות מ-AI
+    if (!navigator.onLine || !window.OPENAI_API_KEY) {
+      console.log("משתמש רק בשאלות מקומיות - אין חיבור לאינטרנט או מפתח API");
+      return localQuestions;
+    }
+    
     try {
-      // 2. ניסיון לקבל שאלות מהשרת (ChatGPT)
-      if (navigator.onLine && window.OPENAI_API_KEY) {
-        console.log("מבקש שאלות נוספות מהשרת...");
+      console.log("מבקש שאלות נוספות מבוססות AI...");
+      showToast('info', 'מייצר שאלות מותאמות אישית...');
+      
+      // שליחת בקשה לשרת
+      const response = await fetch('/api/get-dynamic-questions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ complaint, previousAnswers })
+      });
+      
+      if (!response.ok) {
+        throw new Error(`שגיאת שרת: ${response.status} - ${response.statusText}`);
+      }
+      
+      const result = await response.json();
+      
+      if (result.success && result.questions && result.questions.length > 0) {
+        console.log(`התקבלו ${result.questions.length} שאלות מותאמות AI`);
+        showToast('success', 'התקבלו שאלות מותאמות אישית');
         
-        // הצגת הודעה למשתמש
-        showToast('info', 'מייצר שאלות מותאמות אישית...');
-        
-        // שליחת בקשה לשרת
-        const response = await fetch('/api/get-dynamic-questions', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({ complaint, previousAnswers })
-        });
-        
-        if (!response.ok) {
-          throw new Error(`שגיאת שרת: ${response.status}`);
-        }
-        
-        const result = await response.json();
-        
-        if (result.success && result.questions && result.questions.length > 0) {
-          console.log(`התקבלו ${result.questions.length} שאלות מהשרת`);
-          showToast('success', 'התקבלו שאלות מותאמות אישית');
-          
-          // שלב משולב: קודם שאלות מקומיות ואחריהן שאלות AI
-          return [...localQuestions, ...result.questions];
-        }
+        // שילוב השאלות המקומיות והשאלות מ-AI
+        return [...localQuestions, ...result.questions];
       }
     } catch (error) {
       console.error("שגיאה בקבלת שאלות מהשרת:", error);
       showToast('warning', 'לא ניתן היה לקבל שאלות מותאמות אישית - משתמש בשאלות מקומיות');
     }
     
-    // 3. במקרה של שגיאה, החזר רק שאלות מקומיות
-    console.log("משתמש רק בשאלות מקומיות");
     return localQuestions;
   }
   
   /**
-   * פונקציית גיבוי שמחזירה שאלות דינמיות לוקאליות
-   * זו העתק של הפונקציה המקורית (ללא קריאה ל-API)
+   * פונקציה לקבלת שאלות דינמיות מקומיות לפי תלונה ותשובות קודמות
+   * @param {string} complaint - התלונה העיקרית
+   * @param {object} previousAnswers - תשובות קודמות
+   * @returns {Array} - מערך שאלות דינמיות מקומיות
    */
   function getLocalDynamicQuestions(complaint, previousAnswers) {
-    // פונקציית עזר שמזהה אם מילה כלשהי הופיעה בתשובה
+    // פונקציית עזר לזיהוי סימפטומים בתשובות קודמות
     const hasSymptom = (keyword) => {
-      return Object.entries(previousAnswers).some(([question, answer]) =>
-        question.toLowerCase().includes(keyword.toLowerCase()) ||
-        answer.toLowerCase().includes(keyword.toLowerCase())
-      );
+      return Object.entries(previousAnswers).some(([question, answer]) => {
+        if (typeof answer !== 'string') return false;
+        if (typeof question !== 'string') return false;
+        
+        return question.toLowerCase().includes(keyword.toLowerCase()) ||
+               answer.toLowerCase().includes(keyword.toLowerCase());
+      });
     };
   
-    // מיפה של שאלות סטטיות
+    // מיפוי שאלות דינמיות לפי סוגי תלונות
     const dynamicQuestionsMap = {
       "כאב ראש": [
         {
@@ -3551,9 +3462,7 @@ async function getDynamicQuestions(complaint, previousAnswers) {
         }
       ],
       
-      // הוסף כאן את כל שאר המיפויים שיש לך כבר
-      
-      // שאלות כלליות לברירת מחדל
+      // שאלות ברירת מחדל לכל סוגי התלונות
       "default": [
         {
           type: "multiselect",
@@ -3578,8 +3487,10 @@ async function getDynamicQuestions(complaint, previousAnswers) {
       ]
     };
   
-    // זיהוי המפתח המתאים
+    // זיהוי המפתח המתאים לתלונה
     let questionsKey = "default";
+    
+    // חיפוש מילות מפתח בתלונה
     if (complaint.includes("שריר")) {
       questionsKey = "כאב שרירים";
     } else if (complaint.includes("גב")) {
@@ -3589,20 +3500,93 @@ async function getDynamicQuestions(complaint, previousAnswers) {
     } else if (complaint.includes("בטן")) {
       questionsKey = "כאב בטן";
     } else {
-      // חיפוש התאמה ישירה
+      // חיפוש התאמה ישירה במפתחות הקיימים
       const foundKey = Object.keys(dynamicQuestionsMap).find(key =>
         complaint.includes(key) || key.includes(complaint)
       );
+      
       if (foundKey) questionsKey = foundKey;
     }
   
+    // החזרת השאלות המתאימות או שאלות ברירת מחדל
     return dynamicQuestionsMap[questionsKey] || dynamicQuestionsMap["default"];
   }
   
-  // 3. עדכן את הפונקציה handleStep2to3 לעבודה עם הפונקציה האסינכרונית:
+  /**
+   * קבלת שאלות דינמיות ישירות מ-OpenAI API
+   * @param {string} complaint - התלונה העיקרית
+   * @param {object} previousAnswers - תשובות קודמות
+   * @returns {Promise<Array>} - מערך שאלות מ-AI
+   */
+  async function getDynamicQuestionsFromChatGPT(complaint, previousAnswers) {
+    try {
+      const apiKey = window.OPENAI_API_KEY;
+      
+      if (!apiKey) {
+        console.error("מפתח API לא מוגדר!");
+        return [];
+      }
   
+      // יצירת פרומפט לשאלות המשך רלוונטיות
+      const prompt = `
+        התלונה העיקרית של המטופל/ת: "${complaint}"
+        
+        התשובות הקודמות שניתנו הן:
+        ${JSON.stringify(previousAnswers, null, 2)}
+        
+        אנא צור/י 3 עד 5 שאלות המשך רפואיות נוספות, רלוונטיות וממוקדות,
+        בעברית. כתוב/י כל שאלה בשורה חדשה, ללא מספור וללא פרטים נוספים.
+      `.trim();
+  
+      // שליחת בקשה ל-OpenAI API
+      const response = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey}`
+        },
+        body: JSON.stringify({
+          model: 'gpt-3.5-turbo',
+          messages: [{ role: 'user', content: prompt }],
+          temperature: 0.7
+        })
+      });
+  
+      // בדיקת תקינות התשובה
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(`שגיאת API: ${response.status} - ${errorData.error?.message || response.statusText}`);
+      }
+  
+      // עיבוד התשובה
+      const data = await response.json();
+      const content = data.choices[0].message.content;
+  
+      // פילטור ועיבוד השאלות מהתשובה
+      const questions = content
+        .split('\n')
+        .map(line => line.trim())
+        .filter(Boolean)
+        .filter(line => line.endsWith('?'))
+        .map(question => ({
+          type: 'multiline',
+          question: question
+        }));
+  
+      return questions;
+      
+    } catch (error) {
+      console.error('שגיאה בפנייה ל-ChatGPT API:', error);
+      return [];
+    }
+  }
+  
+  /**
+   * טיפול במעבר משלב 2 לשלב 3
+   * איסוף תשובות מהשלב הקודם והצגת שאלות דינמיות
+   */
   async function handleStep2to3() {
-    // איסוף תשובות לשאלות סטנדרטיות
+    // איסוף תשובות מהשאלות הסטנדרטיות
     const standardAnswers = collectAnswers('input[data-standard="true"], select[data-standard="true"], textarea[data-standard="true"], input[type="hidden"][data-standard="true"]');
     
     // שמירת התשובות ברשומת המטופל
@@ -3611,7 +3595,7 @@ async function getDynamicQuestions(complaint, previousAnswers) {
     // שמירת מדדים חיוניים
     state.patientRecord.vitalSigns = collectVitalSigns();
     
-    // שמירת מיקום פציעה אם רלוונטי
+    // שמירת מיקום פציעה אם קיים
     const injuryLocationValue = getElement('#injury-location-value');
     if (injuryLocationValue && injuryLocationValue.value) {
       state.patientRecord.standardAnswers['מיקום הפציעה המדויק'] = injuryLocationValue.value;
@@ -3625,66 +3609,19 @@ async function getDynamicQuestions(complaint, previousAnswers) {
     showStep(3);
     
     try {
-      // קריאה אסינכרונית לקבלת שאלות דינמיות
+      // קבלת שאלות דינמיות
       const dynamicQuestions = await getDynamicQuestions(
         state.patientRecord.patientInfo.mainComplaint, 
         standardAnswers
       );
       
-      // יצירת אלמנטי שאלות דינמיות
-      const questionsList = getElement('#dynamic-questions-list');
-      questionsList.innerHTML = '';
-      
-      // יצירת פרגמנט לביצועים טובים
-      const questionsFragment = document.createDocumentFragment();
-      
-      if (!dynamicQuestions || dynamicQuestions.length === 0) {
-        const noQuestionsItem = createElement('li', {
-          className: 'question-item',
-          text: 'אין שאלות נוספות לתלונה זו. נא לעבור לשלב הבא.'
-        });
-        questionsFragment.appendChild(noQuestionsItem);
-      } else {
-        dynamicQuestions.forEach((question, index) => {
-          const questionElement = createQuestionElement(question, index, false);
-          questionsFragment.appendChild(questionElement);
-        });
-      }
-      
-      // הוספת אפשרות להערות חופשיות
-      const freeTextContainer = createElement('div', {
-        className: 'free-notes-container'
-      });
-      
-      const freeTextTitle = createElement('h3', {
-        text: 'מידע נוסף'
-      });
-      
-      const freeTextArea = createElement('textarea', {
-        className: 'free-text-area',
-        rows: 5,
-        placeholder: 'הוסף כל מידע נוסף שלא נכלל בשאלות הקודמות...',
-        dataset: {
-          question: 'מידע נוסף',
-          dynamic: 'true',
-          type: 'multiline'
-        },
-        events: {
-          input: () => { state.unsavedChanges = true; }
-        }
-      });
-      
-      freeTextContainer.appendChild(freeTextTitle);
-      freeTextContainer.appendChild(freeTextArea);
-      questionsFragment.appendChild(freeTextContainer);
-      
-      // הוספת כל השאלות במהלך אחד לצמצום reflows
-      questionsList.appendChild(questionsFragment);
+      // יצירת אלמנטי השאלות
+      renderDynamicQuestions(dynamicQuestions);
       
     } catch (error) {
       console.error("שגיאה בטעינת שאלות דינמיות:", error);
       
-      // במקרה של שגיאה, הצג הודעה למשתמש
+      // הצגת הודעת שגיאה
       const questionsList = getElement('#dynamic-questions-list');
       questionsList.innerHTML = `
         <li class="question-item error-item">
@@ -3693,12 +3630,114 @@ async function getDynamicQuestions(complaint, previousAnswers) {
         </li>
       `;
     } finally {
-      // הסתרת אנימציית הטעינה והצגת השאלות בכל מקרה
+      // הסתרת אנימציית הטעינה בכל מקרה
       getElement('#dynamic-questions-loading').style.display = 'none';
       getElement('#dynamic-questions-container').style.display = 'block';
     }
   }
   
+  /**
+   * רינדור שאלות דינמיות לממשק המשתמש
+   * @param {Array} dynamicQuestions - מערך שאלות דינמיות
+   */
+  function renderDynamicQuestions(dynamicQuestions) {
+    const questionsList = getElement('#dynamic-questions-list');
+    questionsList.innerHTML = '';
+    
+    // יצירת פרגמנט לביצועים טובים
+    const questionsFragment = document.createDocumentFragment();
+    
+    // בדיקה אם יש שאלות
+    if (!dynamicQuestions || dynamicQuestions.length === 0) {
+      const noQuestionsItem = createElement('li', {
+        className: 'question-item',
+        text: 'אין שאלות נוספות לתלונה זו. נא לעבור לשלב הבא.'
+      });
+      questionsFragment.appendChild(noQuestionsItem);
+    } else {
+      // יצירת אלמנט לכל שאלה
+      dynamicQuestions.forEach((question, index) => {
+        const questionElement = createQuestionElement(question, index, false);
+        questionsFragment.appendChild(questionElement);
+      });
+    }
+    
+    // הוספת שדה טקסט חופשי לסוף השאלון
+    const freeTextContainer = createFreeTextArea();
+    questionsFragment.appendChild(freeTextContainer);
+    
+    // הוספת כל השאלות במהלך אחד
+    questionsList.appendChild(questionsFragment);
+  }
+  
+  /**
+   * יצירת אזור טקסט חופשי להערות נוספות
+   * @returns {HTMLElement} - האלמנט שנוצר
+   */
+  function createFreeTextArea() {
+    const freeTextContainer = createElement('div', {
+      className: 'free-notes-container'
+    });
+    
+    const freeTextTitle = createElement('h3', {
+      text: 'מידע נוסף'
+    });
+    
+    const freeTextArea = createElement('textarea', {
+      className: 'free-text-area',
+      rows: 5,
+      placeholder: 'הוסף כל מידע נוסף שלא נכלל בשאלות הקודמות...',
+      dataset: {
+        question: 'מידע נוסף',
+        dynamic: 'true',
+        type: 'multiline'
+      },
+      events: {
+        input: () => { state.unsavedChanges = true; }
+      }
+    });
+    
+    freeTextContainer.appendChild(freeTextTitle);
+    freeTextContainer.appendChild(freeTextArea);
+    
+    return freeTextContainer;
+  }
+  
+  /**
+   * הצגת הודעת טוסט למשתמש
+   * @param {string} type - סוג ההודעה (info, success, warning, error)
+   * @param {string} message - תוכן ההודעה
+   * @param {number} duration - משך הצגת ההודעה במילישניות
+   */
+  function showToast(type, message, duration = 3000) {
+    const toast = createElement('div', {
+      className: `toast toast-${type}`,
+      text: message
+    });
+    
+    const toastContainer = getElement('#toast-container') || 
+      (() => {
+        const container = createElement('div', { id: 'toast-container' });
+        document.body.appendChild(container);
+        return container;
+      })();
+    
+    toastContainer.appendChild(toast);
+    
+    // אנימציה והסרה לאחר זמן
+    setTimeout(() => {
+      toast.classList.add('show');
+      
+      setTimeout(() => {
+        toast.classList.remove('show');
+        
+        // הסרת האלמנט לאחר סיום האנימציה
+        setTimeout(() => {
+          toast.remove();
+        }, 300);
+      }, duration);
+    }, 10);
+  }
   
 
 // ======== הפעלת האפליקציה בטעינת הדף ========

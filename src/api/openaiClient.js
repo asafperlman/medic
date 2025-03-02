@@ -18,6 +18,69 @@ const cache = new CacheManager({
   defaultTTL: config.openai.cacheTTL || 86400000 // 24 שעות במילישניות
 });
 
+// src/api/openaiClient.js
+
+const OpenAIClient = {
+  // בדיקת חיבור לשרת
+  testConnection: async function() {
+    try {
+      const apiKey = config.openai.apiKey || process.env.OPENAI_API_KEY;
+      
+      if (!apiKey) {
+        console.error('מפתח API לא נמצא');
+        return false;
+      }
+      
+      const response = await axios.get('https://api.openai.com/v1/models', {
+        headers: {
+          'Authorization': `Bearer ${apiKey}`
+        },
+        timeout: 5000
+      });
+      
+      return response.status === 200;
+    } catch (error) {
+      console.error('שגיאה בבדיקת חיבור:', error.message);
+      return false;
+    }
+  },
+  
+  // שליחת בקשה למודל
+  sendRequest: async function(model, messages, options = {}) {
+    try {
+      const apiKey = config.openai.apiKey || process.env.OPENAI_API_KEY;
+      
+      if (!apiKey) {
+        throw new Error('מפתח API לא נמצא');
+      }
+      
+      const response = await axios.post(
+        'https://api.openai.com/v1/chat/completions',
+        {
+          model: model,
+          messages: messages,
+          temperature: options.temperature || 0.2,
+          max_tokens: options.maxTokens || 1000
+        },
+        {
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${apiKey}`
+          },
+          timeout: options.timeout || 30000
+        }
+      );
+      
+      return response.data;
+    } catch (error) {
+      console.error('שגיאה בשליחת בקשה ל-OpenAI:', error.message);
+      throw error;
+    }
+  }
+};
+
+module.exports = OpenAIClient;
+
 // מודול ה-LLM
 const LLMService = {
   // קונפיגורציה

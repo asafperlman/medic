@@ -9,6 +9,8 @@
 const config = require('../../config');
 const axios = require('axios');
 const CacheManager = require('../utils/cacheManager');
+// עדכון ייבוא OpenAI Client
+const openaiClient = require('./openaiClient');
 
 // יצירת מנהל מטמון 
 const cache = new CacheManager({
@@ -72,7 +74,7 @@ const LLMService = {
   sendPrompt: async function(prompt, options = {}) {
     const cacheKey = prompt + JSON.stringify(options);
     
-    // בדיקה במטמון אם המטמון מופעל
+    // בדיקה במטמון
     if (this.config.useCache) {
       const cachedResponse = await cache.get(cacheKey);
       if (cachedResponse) {
@@ -88,63 +90,38 @@ const LLMService = {
       const finalOptions = {
         model: options.model || this.config.defaultModel,
         temperature: options.temperature !== undefined ? options.temperature : this.config.temperature,
-        max_tokens: options.maxTokens || this.config.maxTokens,
+        maxTokens: options.maxTokens || this.config.maxTokens,
         ...options
       };
       
       if (process.env.NODE_ENV === 'production' || process.env.USE_OPENAI_API === 'true') {
         // שליחת בקשה אמיתית ל-OpenAI API
         console.log('שולח בקשה אמיתית ל-OpenAI API');
-        let response = null;
-        let retries = 0;
         
-        while (retries <= this.config.maxRetries) {
-          try {
-            response = await axios.post(
-              this.config.apiEndpoint,
-              {
-                model: finalOptions.model,
-                messages: [{ role: 'user', content: prompt }],
-                temperature: finalOptions.temperature,
-                max_tokens: finalOptions.max_tokens
-              },
-              {
-                headers: {
-                  'Content-Type': 'application/json',
-                  'Authorization': `Bearer ${this.config.apiKey}`
-                },
-                timeout: this.config.timeout
-              }
-            );
-            break; // יציאה מהלולאה אם הבקשה הצליחה
-          } catch (error) {
-            retries++;
-            console.warn(`ניסיון ${retries}/${this.config.maxRetries + 1} נכשל:`, error.message);
-            
-            if (retries > this.config.maxRetries) {
-              throw error; // זריקת השגיאה אם כל הניסיונות נכשלו
-            }
-            
-            // המתנה לפני ניסיון חוזר
-            await new Promise(resolve => setTimeout(resolve, this.config.retryDelay));
+        const response = await openaiClient.sendRequest(
+          finalOptions.model,
+          [{ role: 'user', content: prompt }],
+          {
+            temperature: finalOptions.temperature,
+            maxTokens: finalOptions.max_tokens,
+            timeout: this.config.timeout
           }
-        }
+        );
         
-        console.log('התקבלה תשובה מ-OpenAI API');
-        const content = response.data.choices[0].message.content;
+        const content = response.choices[0].message.content;
         
-        // שמירה במטמון אם המטמון מופעל
+        // שמירה במטמון
         if (this.config.useCache) {
           await cache.set(cacheKey, content, this.config.cacheTTL);
         }
         
         return content;
       } else {
-        // במצב פיתוח נחזיר תשובה דמה
+        // במצב פיתוח - סימולציה
         console.log('מצב פיתוח: משתמש בסימולציה במקום קריאה אמיתית ל-API');
         let response = "";
         
-        // בדיקה אם הפרומפט קשור לשאלות המשך או לסיכום
+        // בדיקה לפי סוג הפרומפט
         if (prompt.includes("שאלות המשך") || prompt.includes("שאלות נוספות")) {
           response = this._simulateFollowupQuestions(prompt);
         } else if (prompt.includes("סיכום") || prompt.includes("אנמנזה")) {
@@ -154,7 +131,7 @@ const LLMService = {
           response = "תשובה לפרומפט כללי. בסביבת ייצור, זו הייתה תשובה אמיתית מ-LLM.";
         }
         
-        // שמירה במטמון אם המטמון מופעל
+        // שמירה במטמון
         if (this.config.useCache) {
           await cache.set(cacheKey, response, this.config.cacheTTL);
         }
