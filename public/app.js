@@ -1,4 +1,4 @@
-// public/app.js - גרסה מיועלת ומשופרת
+// public/app.js - גרסה משופרת ומתוקנת
 
 /**
  * מערכת איסוף נתונים רפואיים - צד לקוח
@@ -24,7 +24,13 @@ const state = {
     
     // ממטמון פנימי לשיפור ביצועים
     cachedElements: new Map(),
-    cachedQuestions: new Map()
+    cachedQuestions: new Map(),
+    
+    // הוספת מעקב אחר תור חיפוש לשיפור ביצועים
+    searchDelay: null,
+    
+    // הוספת מצב פעיל לחיפוש
+    isSearchActive: false
 };
 
 // מאגר תלונות רלוונטיות לשאלון משרדי - צומצם למה שרלוונטי
@@ -116,6 +122,13 @@ function createElement(tag, options = {}) {
         }
     }
     
+    // הוספת מאפיינים נוספים
+    if (options.attributes) {
+        for (const [attr, value] of Object.entries(options.attributes)) {
+            element.setAttribute(attr, value);
+        }
+    }
+    
     return element;
 }
 
@@ -127,83 +140,90 @@ function createElement(tag, options = {}) {
 function showStep(stepNumber, skipConfirm = false) {
     // בדיקת שינויים לא שמורים רק אם יש שינוי אמיתי בערכים
     if (!skipConfirm && state.unsavedChanges && state.currentStep !== stepNumber) {
-      // לפני הצגת ההודעה, בדוק אם יש שינויים משמעותיים
-      const currentFormData = collectCurrentFormData();
-      const hasSignificantChanges = checkSignificantChanges(currentFormData);
-      
-      if (hasSignificantChanges) {
-        const confirmMove = confirm("יש לך שינויים שלא נשמרו. האם אתה בטוח שברצונך לעבור לשלב אחר?");
-        if (!confirmMove) {
-          return;
+        // לפני הצגת ההודעה, בדוק אם יש שינויים משמעותיים
+        const currentFormData = collectCurrentFormData();
+        const hasSignificantChanges = checkSignificantChanges(currentFormData);
+        
+        if (hasSignificantChanges) {
+            const confirmMove = confirm("יש לך שינויים שלא נשמרו. האם אתה בטוח שברצונך לעבור לשלב אחר?");
+            if (!confirmMove) {
+                return;
+            }
+        } else {
+            // אם אין שינויים משמעותיים, איפוס המצב ללא הודעה
+            state.unsavedChanges = false;
         }
-      } else {
-        // אם אין שינויים משמעותיים, איפוס המצב ללא הודעה
-        state.unsavedChanges = false;
-      }
     }
-  
+
     // הסתרת כל השלבים
     document.querySelectorAll('.step').forEach(step => {
-      step.classList.remove('active');
+        step.classList.remove('active');
     });
-  
+
     // הצגת השלב הנבחר
     const currentStepElement = document.getElementById(`step${stepNumber}`);
     if (currentStepElement) {
-      currentStepElement.classList.add('active');
+        currentStepElement.classList.add('active');
+    } else {
+        console.error(`לא נמצא אלמנט עבור שלב ${stepNumber}`);
+        return; // מניעת המשך הפונקציה אם האלמנט לא נמצא
     }
-  
+
     // שמירת השלב הנוכחי
     state.currentStep = stepNumber;
-  
+
     // עדכון התצוגה
     updateProgressBar();
     updateButtonsVisibility();
-  }
+}
+
 /**
  * בודק אם יש חיבור לשרת ומתאים את הממשק בהתאם
  */
 function checkServerConnection() {
     const apiStatus = document.getElementById('api-status');
+    if (!apiStatus) return; // אבטחת שגיאה במקרה שהאלמנט לא קיים
     
     fetch('/api/test-openai-connection')
-      .then(response => response.json())
-      .then(data => {
-        if (data.success) {
-          apiStatus.className = 'api-status-indicator api-active';
-          apiStatus.innerHTML = '<i class="fas fa-signal"></i> שרת AI מחובר';
-        } else {
-          apiStatus.className = 'api-status-indicator api-inactive';
-          apiStatus.innerHTML = '<i class="fas fa-exclamation"></i> שרת AI לא זמין';
-        }
-      })
-      .catch(() => {
-        apiStatus.className = 'api-status-indicator api-offline';
-        apiStatus.innerHTML = '<i class="fas fa-exclamation-triangle"></i> מצב לא מקוון';
-      });
-  }
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                apiStatus.className = 'api-status-indicator api-active';
+                apiStatus.innerHTML = '<i class="fas fa-signal"></i> שרת AI מחובר';
+            } else {
+                apiStatus.className = 'api-status-indicator api-inactive';
+                apiStatus.innerHTML = '<i class="fas fa-exclamation"></i> שרת AI לא זמין';
+            }
+        })
+        .catch(() => {
+            apiStatus.className = 'api-status-indicator api-offline';
+            apiStatus.innerHTML = '<i class="fas fa-exclamation-triangle"></i> מצב לא מקוון';
+        });
+}
+
 /**
  * אוסף את המידע הנוכחי מהטופס
  * @returns {object} - המידע הנוכחי מהטופס
  */
-
 function collectCurrentFormData() {
-  // איסוף מידע ספציפי לכל שלב
-  switch (state.currentStep) {
-    case 1:
-      return {
-        age: getElement('#patient-age')?.value || '',
-        gender: getSelectedRadioValue('gender') || '',
-        mainComplaint: getElement('#main-complaint')?.value || '',
-        profile: getSelectedRadioValue('profile') || ''
-      };
-    case 2:
-      return collectAnswers('input[data-standard="true"], select[data-standard="true"], textarea[data-standard="true"], input[type="hidden"][data-standard="true"]');
-    case 3:
-      return collectAnswers('input[data-dynamic="true"], select[data-dynamic="true"], textarea[data-dynamic="true"], input[type="hidden"][data-dynamic="true"]');
-    default:
-      return {};
-  }
+    // איסוף מידע ספציפי לכל שלב
+    switch (state.currentStep) {
+        case 1:
+            const ageElement = getElement('#patient-age');
+            const mainComplaintElement = getElement('#main-complaint');
+            return {
+                age: ageElement?.value || '',
+                gender: getSelectedRadioValue('gender') || '',
+                mainComplaint: mainComplaintElement?.value || '',
+                profile: getSelectedRadioValue('profile') || ''
+            };
+        case 2:
+            return collectAnswers('input[data-standard="true"], select[data-standard="true"], textarea[data-standard="true"], input[type="hidden"][data-standard="true"]');
+        case 3:
+            return collectAnswers('input[data-dynamic="true"], select[data-dynamic="true"], textarea[data-dynamic="true"], input[type="hidden"][data-dynamic="true"]');
+        default:
+            return {};
+    }
 }
 
 /**
@@ -212,138 +232,21 @@ function collectCurrentFormData() {
  * @returns {boolean} - האם יש שינויים משמעותיים
  */
 function checkSignificantChanges(currentData) {
-  // אם אין מידע קודם, אין שינויים משמעותיים
-  if (!state.patientRecord) return false;
-  
-  // בדיקה לפי השלב הנוכחי
-  switch (state.currentStep) {
-    case 1:
-      // בדיקה אם מולאו שדות חשובים
-      return currentData.age || currentData.mainComplaint;
-    case 2:
-    case 3:
-      // בדיקה אם יש תשובות כלשהן
-      return Object.keys(currentData).length > 0;
-    default:
-      return false;
-  }
-}/**
-/**
- * פונקציה להצגת שלב מסוים, ממוטבת לביצועים
- * @param {number} stepNumber - מספר השלב להצגה
- * @param {boolean} skipConfirm - האם לדלג על אישור שינויים
- */
-function showStep(stepNumber, skipConfirm = false) {
-    // בדיקת שינויים לא שמורים רק אם יש שינוי אמיתי בערכים
-    if (!skipConfirm && state.unsavedChanges && state.currentStep !== stepNumber) {
-      // לפני הצגת ההודעה, בדוק אם יש שינויים משמעותיים
-      const currentFormData = collectCurrentFormData();
-      const hasSignificantChanges = checkSignificantChanges(currentFormData);
-      
-      if (hasSignificantChanges) {
-        const confirmMove = confirm("יש לך שינויים שלא נשמרו. האם אתה בטוח שברצונך לעבור לשלב אחר?");
-        if (!confirmMove) {
-          return;
-        }
-      } else {
-        // אם אין שינויים משמעותיים, איפוס המצב ללא הודעה
-        state.unsavedChanges = false;
-      }
-    }
-  
-    // שאר הקוד נשאר כפי שהוא...
-  }
-  
-  /**
-   * אוסף את המידע הנוכחי מהטופס
-   * @returns {object} - המידע הנוכחי מהטופס
-   */
-  function collectCurrentFormData() {
-    // איסוף מידע ספציפי לכל שלב
-    switch (state.currentStep) {
-      case 1:
-        return {
-          age: getElement('#patient-age')?.value || '',
-          gender: getSelectedRadioValue('gender') || '',
-          mainComplaint: getElement('#main-complaint')?.value || '',
-          profile: getSelectedRadioValue('profile') || ''
-        };
-      case 2:
-        return collectAnswers('input[data-standard="true"], select[data-standard="true"], textarea[data-standard="true"], input[type="hidden"][data-standard="true"]');
-      case 3:
-        return collectAnswers('input[data-dynamic="true"], select[data-dynamic="true"], textarea[data-dynamic="true"], input[type="hidden"][data-dynamic="true"]');
-      default:
-        return {};
-    }
-  }
-  
-  /**
-   * בודק אם יש שינויים משמעותיים בטופס
-   * @param {object} currentData - המידע הנוכחי מהטופס
-   * @returns {boolean} - האם יש שינויים משמעותיים
-   */
-  function checkSignificantChanges(currentData) {
     // אם אין מידע קודם, אין שינויים משמעותיים
     if (!state.patientRecord) return false;
     
     // בדיקה לפי השלב הנוכחי
     switch (state.currentStep) {
-      case 1:
-        // בדיקה אם מולאו שדות חשובים
-        return currentData.age || currentData.mainComplaint;
-      case 2:
-      case 3:
-        // בדיקה אם יש תשובות כלשהן
-        return Object.keys(currentData).length > 0;
-      default:
-        return false;
+        case 1:
+            // בדיקה אם מולאו שדות חשובים
+            return currentData.age || currentData.mainComplaint;
+        case 2:
+        case 3:
+            // בדיקה אם יש תשובות כלשהן
+            return Object.keys(currentData).length > 0;
+        default:
+            return false;
     }
-  }
-
-/**
- * אוסף את המידע הנוכחי מהטופס
- * @returns {object} - המידע הנוכחי מהטופס
- */
-function collectCurrentFormData() {
-  // איסוף מידע ספציפי לכל שלב
-  switch (state.currentStep) {
-    case 1:
-      return {
-        age: getElement('#patient-age')?.value || '',
-        gender: getSelectedRadioValue('gender') || '',
-        mainComplaint: getElement('#main-complaint')?.value || '',
-        profile: getSelectedRadioValue('profile') || ''
-      };
-    case 2:
-      return collectAnswers('input[data-standard="true"], select[data-standard="true"], textarea[data-standard="true"], input[type="hidden"][data-standard="true"]');
-    case 3:
-      return collectAnswers('input[data-dynamic="true"], select[data-dynamic="true"], textarea[data-dynamic="true"], input[type="hidden"][data-dynamic="true"]');
-    default:
-      return {};
-  }
-}
-
-/**
- * בודק אם יש שינויים משמעותיים בטופס
- * @param {object} currentData - המידע הנוכחי מהטופס
- * @returns {boolean} - האם יש שינויים משמעותיים
- */
-function checkSignificantChanges(currentData) {
-  // אם אין מידע קודם, אין שינויים משמעותיים
-  if (!state.patientRecord) return false;
-  
-  // בדיקה לפי השלב הנוכחי
-  switch (state.currentStep) {
-    case 1:
-      // בדיקה אם מולאו שדות חשובים
-      return currentData.age || currentData.mainComplaint;
-    case 2:
-    case 3:
-      // בדיקה אם יש תשובות כלשהן
-      return Object.keys(currentData).length > 0;
-    default:
-      return false;
-  }
 }
 
 /**
@@ -536,7 +439,29 @@ function createYesNoInput(container, questionData, questionId, index, isStandard
         id: `${questionId}-no`,
         name: questionId, // אותו name כמו רדיו כן
         value: 'לא',
-        // שאר הקוד...
+        dataset: {
+            question: questionData.question,
+            index: index,
+            type: 'yesNo',
+            standard: isStandard ? 'true' : null,
+            dynamic: !isStandard ? 'true' : null
+        },
+        events: {
+            change: function() {
+                if (this.checked) {
+                    highlightSelectedOption(this.parentElement, true);
+                    
+                    // הסתרת שדה מעקב אם קיים
+                    const followUpContainer = container.querySelector('.follow-up-container');
+                    if (followUpContainer) {
+                        followUpContainer.style.display = 'none';
+                    }
+                    
+                    // סימון שינויים
+                    state.unsavedChanges = true;
+                }
+            }
+        }
     });
     
     noLabel.appendChild(noInput);
@@ -909,6 +834,11 @@ function collectAnswers(selector) {
             return;
         }
         
+        // אם אין שאלה, לא נוסיף לתשובות
+        if (!input.dataset.question) {
+            return;
+        }
+
         // קבלת הערך בהתאם לסוג הפקד
         let value = '';
         
@@ -923,7 +853,8 @@ function collectAnswers(selector) {
             
             // טיפול מיוחד בתשובת "כן" עם שדה מעקב
             if (value === 'כן') {
-                const followUpInput = document.querySelector(`.follow-up-input[data-parent-question="${input.dataset.question}"]`);
+                const followUpSelector = `.follow-up-input[data-parent-question="${input.dataset.question}"]`;
+                const followUpInput = document.querySelector(followUpSelector);
                 if (followUpInput && followUpInput.value.trim() !== '') {
                     value = `כן, ${followUpInput.value.trim()}`;
                 }
@@ -1068,6 +999,9 @@ function createComplaintSearchInterface(complaintSelect, complaints) {
                 // דחיית סינון כדי למנוע עומס על ה-UI
                 clearTimeout(state.searchDelay);
                 state.searchDelay = setTimeout(() => {
+                    // סימון מצב פעיל לחיפוש
+                    state.isSearchActive = searchTerm.length > 0;
+                    
                     // יצירת אפשרויות חדשות
                     const filteredComplaints = searchTerm ? 
                         complaints.filter(complaint => complaint.toLowerCase().includes(searchTerm)) : 
@@ -1076,6 +1010,20 @@ function createComplaintSearchInterface(complaintSelect, complaints) {
                     // עדכון אלמנט ה-select באופן יעיל
                     updateComplaintOptions(complaintSelect, filteredComplaints, searchTerm);
                 }, 200); // דיליי של 200ms למניעת עומס
+            },
+            focus: function() {
+                // הוספת קלאס למיקוד על שדה החיפוש
+                searchContainer.classList.add('focused');
+            },
+            blur: function() {
+                // הסרת קלאס למיקוד כשעוזבים את השדה
+                searchContainer.classList.remove('focused');
+                
+                // אם אין מונח חיפוש והמשתמש עזב את השדה, נציג את כל האפשרויות
+                if (!this.value.trim()) {
+                    updateComplaintOptions(complaintSelect, complaints, '');
+                    state.isSearchActive = false;
+                }
             }
         }
     });
@@ -1084,13 +1032,23 @@ function createComplaintSearchInterface(complaintSelect, complaints) {
     searchContainer.appendChild(searchInput);
     
     // הוספת ממשק החיפוש לפני אלמנט הבחירה
-    complaintSelect.parentElement.insertBefore(searchContainer, complaintSelect);
+    if (complaintSelect.parentElement) {
+        complaintSelect.parentElement.insertBefore(searchContainer, complaintSelect);
+    }
 }
 
 /**
- * עדכון אפשרויות התלונות ביעילות
+ * עדכון אפשרויות התלונות ביעילות - גרסה משופרת
+ * @param {HTMLSelectElement} selectElement - אלמנט הבחירה
+ * @param {Array} filteredComplaints - רשימת התלונות המסוננת
+ * @param {string} searchTerm - מונח החיפוש
  */
 function updateComplaintOptions(selectElement, filteredComplaints, searchTerm) {
+    if (!selectElement) return;
+    
+    // שמירת הערך הנוכחי לפני שינוי האפשרויות
+    const currentValue = selectElement.value;
+    
     // יצירת פרגמנט לביצועים טובים
     const fragment = document.createDocumentFragment();
     
@@ -1099,7 +1057,12 @@ function updateComplaintOptions(selectElement, filteredComplaints, searchTerm) {
     emptyOption.value = '';
     emptyOption.textContent = 'בחר תלונה עיקרית';
     emptyOption.disabled = true;
-    emptyOption.selected = true;
+    
+    // אם אין בחירה נוכחית או שיש חיפוש פעיל, הגדר את האפשרות הריקה כנבחרת
+    if (!currentValue || state.isSearchActive) {
+        emptyOption.selected = true;
+    }
+    
     fragment.appendChild(emptyOption);
     
     // הוספת האפשרויות המסוננות
@@ -1107,28 +1070,52 @@ function updateComplaintOptions(selectElement, filteredComplaints, searchTerm) {
         const option = document.createElement('option');
         option.value = complaint;
         option.textContent = complaint;
+        
+        // שמירת הבחירה הנוכחית אם הערך קיים ולא במצב חיפוש פעיל
+        if (complaint === currentValue && !state.isSearchActive) {
+            option.selected = true;
+        }
+        
         fragment.appendChild(option);
     });
     
-    // אם אין תוצאות ויש מונח חיפוש, מוסיף אפשרות "אחר"
-    if (filteredComplaints.length === 0 && searchTerm) {
+    // אם יש מונח חיפוש ואין תוצאות, מוסיף אפשרות "אחר" עם המונח
+    if (searchTerm && filteredComplaints.length === 0) {
         const otherOption = document.createElement('option');
         otherOption.value = searchTerm;
         otherOption.textContent = `הוסף: "${searchTerm}"`;
+        // מסמן את האפשרות ככברירת מחדל אם אין אפשרויות אחרות
+        otherOption.selected = true;
         fragment.appendChild(otherOption);
     }
     
-    // וידוא שתמיד יש אפשרות "אחר"
+    // וידוא שתמיד יש אפשרות "אחר" אם עוד לא נמצאה
     if (!filteredComplaints.includes('אחר')) {
         const otherOption = document.createElement('option');
         otherOption.value = 'אחר';
         otherOption.textContent = 'אחר';
+        // שמירת הבחירה הנוכחית אם הערך הוא "אחר"
+        if (currentValue === 'אחר') {
+            otherOption.selected = true;
+        }
         fragment.appendChild(otherOption);
     }
     
     // ריקון ועדכון ה-select פעם אחת בלבד
     selectElement.innerHTML = '';
     selectElement.appendChild(fragment);
+    
+    // בדיקה אם נבחר ערך "אחר" כדי להציג את שדה "אחר"
+    if (selectElement.value === 'אחר') {
+        const otherContainer = getElement('#other-complaint-container');
+        if (otherContainer) {
+            otherContainer.style.display = 'block';
+        }
+    }
+    
+    // הפעלת אירוע שינוי כדי שהמערכת תגיב לשינוי באפשרויות
+    const event = new Event('change');
+    selectElement.dispatchEvent(event);
 }
 
 /**
@@ -1351,11 +1338,14 @@ function toggleBodyPartSelection(buttonElement, partId, partName) {
  */
 function updateInjuryLocation() {
     const selectedParts = [];
+    const selectedList = getElement('#selected-body-parts');
     
-    // איסוף האזורים שנבחרו
-    document.querySelectorAll('#selected-body-parts li').forEach(item => {
-        selectedParts.push(item.dataset.partName);
-    });
+    if (selectedList) {
+        // איסוף האזורים שנבחרו
+        selectedList.querySelectorAll('li').forEach(item => {
+            selectedParts.push(item.dataset.partName);
+        });
+    }
     
     // הוספת פרטים ספציפיים אם קיימים
     const specificDetails = getElement('#injury-specific-details');
@@ -1462,47 +1452,6 @@ function getRelevantVitalSigns(complaint) {
  * @param {Array} relevantVitalSigns - מערך מדדים רלוונטיים 
  * @returns {HTMLElement} - טופס מדדים
  */
-
-/**
- * עדכון מאפייני קלט של מדדים חיוניים
- */
-function updateVitalSignInputAttributes() {
-    // קבלת כל שדות המדדים החיוניים
-    const vitalInputs = document.querySelectorAll('.vital-sign-input');
-    
-    // עדכון כל שדה לפי סוג המדד
-    vitalInputs.forEach(input => {
-      const vitalSign = input.dataset.vitalSign;
-      
-      switch (vitalSign) {
-        case 'pulse':
-          input.min = '40';
-          input.max = '200';
-          input.placeholder = 'פעימות לדקה (60-100)';
-          break;
-        case 'bloodPressure':
-          input.pattern = '[0-9]{2,3}/[0-9]{2,3}';
-          input.placeholder = 'לדוגמה: 120/80';
-          break;
-        case 'temperature':
-          input.min = '35';
-          input.max = '43';
-          input.step = '0.1';
-          input.placeholder = 'טמפרטורה (36-38°C)';
-          break;
-        case 'saturation':
-          input.min = '70';
-          input.max = '100';
-          input.placeholder = 'אחוז חמצן (94-100%)';
-          break;
-        case 'respiratoryRate':
-          input.min = '8';
-          input.max = '40';
-          input.placeholder = 'נשימות לדקה (12-20)';
-          break;
-      }
-    });
-  }
 function createVitalSignsForm(relevantVitalSigns) {
     const container = createElement('div', {
         className: 'vital-signs-container fade-in'
@@ -1553,7 +1502,6 @@ function createVitalSignsForm(relevantVitalSigns) {
             min: 8,
             max: 60
         }
-        
     };
     
     // יצירת פרגמנט לביצועים טובים
@@ -1579,16 +1527,16 @@ function createVitalSignsForm(relevantVitalSigns) {
             className: 'vital-sign-input',
             placeholder: signConfig.placeholder,
             dataset: { vitalSign: signConfig.id },
-            attributes: {
-                min: signConfig.min,
-                max: signConfig.max,
-                step: signConfig.step,
-                pattern: signConfig.pattern
-            },
             events: {
                 input: () => { state.unsavedChanges = true; }
             }
         });
+        
+        // הוספת מאפיינים מיוחדים לפי הסוג
+        if (signConfig.min !== undefined) input.min = signConfig.min;
+        if (signConfig.max !== undefined) input.max = signConfig.max;
+        if (signConfig.step !== undefined) input.step = signConfig.step;
+        if (signConfig.pattern !== undefined) input.pattern = signConfig.pattern;
         
         formGroup.appendChild(label);
         formGroup.appendChild(input);
@@ -1601,9 +1549,50 @@ function createVitalSignsForm(relevantVitalSigns) {
     
     setTimeout(() => {
         updateVitalSignInputAttributes();
-      }, 0);
-      
-      return container;
+    }, 0);
+    
+    return container;
+}
+
+/**
+ * עדכון מאפייני קלט של מדדים חיוניים
+ */
+function updateVitalSignInputAttributes() {
+    // קבלת כל שדות המדדים החיוניים
+    const vitalInputs = document.querySelectorAll('.vital-sign-input');
+    
+    // עדכון כל שדה לפי סוג המדד
+    vitalInputs.forEach(input => {
+        const vitalSign = input.dataset.vitalSign;
+        
+        switch (vitalSign) {
+            case 'pulse':
+                input.min = '40';
+                input.max = '200';
+                input.placeholder = 'פעימות לדקה (60-100)';
+                break;
+            case 'bloodPressure':
+                input.pattern = '[0-9]{2,3}/[0-9]{2,3}';
+                input.placeholder = 'לדוגמה: 120/80';
+                break;
+            case 'temperature':
+                input.min = '35';
+                input.max = '43';
+                input.step = '0.1';
+                input.placeholder = 'טמפרטורה (36-38°C)';
+                break;
+            case 'saturation':
+                input.min = '70';
+                input.max = '100';
+                input.placeholder = 'אחוז חמצן (94-100%)';
+                break;
+            case 'respiratoryRate':
+                input.min = '8';
+                input.max = '40';
+                input.placeholder = 'נשימות לדקה (12-20)';
+                break;
+        }
+    });
 }
 
 /**
@@ -1711,24 +1700,43 @@ function resetForm(confirmReset = true) {
     const resetGroups = [
         // איפוס שדות פרופיל בסיסיים
         () => {
-            getElement('#patient-age').value = '';
-            document.querySelectorAll('input[name="gender"]')[0].checked = true;
-            getElement('#main-complaint').selectedIndex = 0;
-            getElement('#other-complaint').value = '';
-            getElement('#other-complaint-container').style.display = 'none';
-            getElement('#doctor-email').value = '';
+            const ageField = getElement('#patient-age');
+            if (ageField) ageField.value = '';
+            
+            const genderRadios = document.querySelectorAll('input[name="gender"]');
+            if (genderRadios.length > 0) genderRadios[0].checked = true;
+            
+            const mainComplaint = getElement('#main-complaint');
+            if (mainComplaint) mainComplaint.selectedIndex = 0;
+            
+            const otherComplaint = getElement('#other-complaint');
+            if (otherComplaint) otherComplaint.value = '';
+            
+            const otherContainer = getElement('#other-complaint-container');
+            if (otherContainer) otherContainer.style.display = 'none';
+            
+            const doctorEmail = getElement('#doctor-email');
+            if (doctorEmail) doctorEmail.value = '';
         },
         
         // איפוס שדות פרופיל רפואי
         () => {
-            document.querySelectorAll('input[name="profile"]')[0].checked = true;
-            getElement('#medical-sections').value = '';
+            const profileRadios = document.querySelectorAll('input[name="profile"]');
+            if (profileRadios.length > 0) profileRadios[0].checked = true;
+            
+            const medicalSections = getElement('#medical-sections');
+            if (medicalSections) medicalSections.value = '';
             
             // איפוס אלרגיות, תרופות ועישון
             ['allergies', 'medications', 'smoking'].forEach(field => {
-                document.querySelectorAll(`input[name="${field}"]`)[0].checked = true;
-                getElement(`#${field}-details`).value = '';
-                getElement(`#${field}-details-container`).style.display = 'none';
+                const radios = document.querySelectorAll(`input[name="${field}"]`);
+                if (radios.length > 0) radios[0].checked = true;
+                
+                const details = getElement(`#${field}-details`);
+                if (details) details.value = '';
+                
+                const container = getElement(`#${field}-details-container`);
+                if (container) container.style.display = 'none';
             });
         },
         
@@ -1778,7 +1786,7 @@ function resetForm(confirmReset = true) {
         }
     ];
     
-    // ביצוע איפוס בקבוצות עם דחיית מרווחים לטיפול בUIזץ
+    // ביצוע איפוס בקבוצות עם דחיית מרווחים לטיפול בUI
     requestAnimationFrame(() => {
         resetGroups.forEach((resetFunction, index) => {
             setTimeout(() => {
@@ -1811,7 +1819,9 @@ function showToast(type, message, duration = 3000) {
     // הסרת הודעות קודמות אם קיימות
     const existingToasts = document.querySelectorAll('.toast-notification');
     existingToasts.forEach(toast => {
-        document.body.removeChild(toast);
+        if (document.body.contains(toast)) {
+            document.body.removeChild(toast);
+        }
     });
     
     // יצירת הודעה חדשה
@@ -2020,29 +2030,20 @@ function createDetailedMedicalSummary(patientRecord, includeRecommendations = fa
                     treatments.push(`${question.replace(/\?/g, '').trim()}: ${answer}`);
                 }
             }
-            // תיקון: התאמת ניסוח לפי מגדר
-// בערך בשורה 2000 בפונקציה createDetailedMedicalSummary
-// בתוך הלולאה שעוברת על התשובות
-
-if (answer.toLowerCase().match(/^לא|אין|שולל/)) {
-    const negTermBase = question
-        .replace(/\?|האם יש|האם|יש/gi, '')
-        .trim()
-        .replace(/^\s+|\s+$/g, ''); // הסרת רווחים מיותרים
-    
-    // התאם את הניסוח למגדר המטופל
-    const genderPrefix = gender === 'male' ? 'שולל' : 'שוללת';
-    
-    if (negTermBase) {
-        negativeFindings.push(`${genderPrefix} ${negTermBase}`);
-    }
-}
-
-    // וכן בהמשך, כאשר בונים את המשפט של הממצאים השליליים:
-    if (negativeFindings.length > 0) {
-        summary += `\n\nממצאים שליליים: ${negativeFindings.join("; ")}. `;
-    }
-
+            // התאמת ניסוח לפי מגדר
+            else if (answer.toLowerCase().match(/^לא|אין|שולל/)) {
+                const negTermBase = question
+                    .replace(/\?|האם יש|האם|יש/gi, '')
+                    .trim()
+                    .replace(/^\s+|\s+$/g, ''); // הסרת רווחים מיותרים
+                
+                // התאם את הניסוח למגדר המטופל
+                const genderPrefix = gender === 'male' ? 'שולל' : 'שוללת';
+                
+                if (negTermBase) {
+                    negativeFindings.push(`${genderPrefix} ${negTermBase}`);
+                }
+            }
             // הוספת מידע נוסף שלא סווג לקטגוריות מוגדרות
             else if (!question.match(/אחר|נוסף|שם|גיל|כתובת|טלפון/i)) {
                 // הוספת מידע נוסף שלא סווג לקטגוריות מוגדרות
@@ -2155,7 +2156,6 @@ if (answer.toLowerCase().match(/^לא|אין|שולל/)) {
         return `פרופיל ${profile}, ${medicalSections || "ללא סעיפים"}, ${allergies || "ללא אלרגיות ידועות"}, ${medications || "לא נוטל/ת תרופות באופן קבוע"}.\n\nמטופל/ת בן/בת ${age}, ${genderText}, ${smoking === 'yes' ? 'מעשן/ת' : 'לא מעשן/ת'}, פונה עם תלונה עיקרית של ${mainComplaint}.\n\nלא ניתן היה להפיק סיכום מפורט בשל בעיה טכנית.`;
     }
 }
-
 // ======== אתחול המערכת והתחלת האפליקציה ========
 
 /**
