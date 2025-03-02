@@ -500,6 +500,941 @@ function createYesNoInput(container, questionData, questionId, index, isStandard
 /**
  * יצירת רכיב בחירה מרובה משופר
  */
+
+// להוסיף בתחילת הקובץ, מיד אחרי הגדרת המשתנים הגלובליים והקבועים
+
+/**
+ * פונקציות טיפול באירועי ניווט - מוגדרות מראש
+ * כדי למנוע בעיות תלות הדדית
+ */
+function handleStep1to2() {
+    // איסוף נתוני הפרופיל הרפואי
+    const profile = getSelectedRadioValue('profile');
+    const medicalSections = getElement('#medical-sections').value.trim();
+    
+    // בדיקה והכנת אלרגיות
+    const hasAllergies = getSelectedRadioValue('allergies') === 'yes';
+    let allergiesDetails = "ללא אלרגיות ידועות";
+    if (hasAllergies) {
+        allergiesDetails = getElement('#allergies-details').value.trim();
+        if (!allergiesDetails) {
+            showToast('error', 'נא לפרט את האלרגיות');
+            return;
+        }
+    }
+    
+    // בדיקה והכנת תרופות
+    const takesMedications = getSelectedRadioValue('medications') === 'yes';
+    let medicationsDetails = "לא נוטל תרופות באופן קבוע";
+    if (takesMedications) {
+        medicationsDetails = getElement('#medications-details').value.trim();
+        if (!medicationsDetails) {
+            showToast('error', 'נא לפרט את התרופות');
+            return;
+        }
+    }
+    
+    // בדיקה והכנת עישון
+    const isSmoking = getSelectedRadioValue('smoking') === 'yes';
+    let smokingDetails = "לא מעשן";
+    if (isSmoking) {
+        smokingDetails = getElement('#smoking-details').value.trim();
+        smokingDetails = smokingDetails ? `מעשן, ${smokingDetails}` : "מעשן";
+    }
+    
+    // וידוא שכל השדות הנדרשים מולאו
+    const age = getElement('#patient-age').value;
+    const gender = getSelectedRadioValue('gender');
+    const mainComplaintSelect = getElement('#main-complaint');
+    let mainComplaint = mainComplaintSelect.value;
+    
+    // בדיקת תקינות הנתונים
+    if (!age || age < 0 || age > 120) {
+        showToast('error', 'יש להזין גיל תקין (0-120)');
+        return;
+    }
+    
+    if (!gender) {
+        showToast('error', 'יש לבחור מין');
+        return;
+    }
+    
+    if (!mainComplaint) {
+        showToast('error', 'יש לבחור תלונה עיקרית');
+        return;
+    }
+    
+    // אם נבחר "אחר", לקחת את הערך מהשדה הנוסף
+    if (mainComplaint === 'אחר') {
+        const otherComplaint = getElement('#other-complaint').value.trim();
+        if (!otherComplaint) {
+            showToast('error', 'יש לפרט את התלונה האחרת');
+            return;
+        }
+        mainComplaint = otherComplaint;
+    }
+    
+    // יצירת רשומת מטופל חדשה
+    state.patientRecord = {
+        patientInfo: {
+            age: parseInt(age),
+            gender: gender,
+            mainComplaint: mainComplaint,
+            timestamp: new Date().toISOString(),
+            profile: profile,
+            medicalSections: medicalSections || "ללא סעיפים",
+            allergies: hasAllergies ? allergiesDetails : "ללא אלרגיות ידועות",
+            medications: takesMedications ? medicationsDetails : "לא נוטל תרופות באופן קבוע",
+            smoking: isSmoking ? "yes" : "no"
+        },
+        standardAnswers: {},
+        dynamicAnswers: {},
+        vitalSigns: {},
+        summary: ""
+    };
+    
+    // קבלת מדדים חיוניים רלוונטיים לתלונה
+    const relevantVitalSigns = getRelevantVitalSigns(mainComplaint);
+    
+    // בדיקת מטמון שאלות - לשיפור ביצועים
+    let standardQuestions;
+    if (state.cachedQuestions.has(mainComplaint)) {
+        standardQuestions = state.cachedQuestions.get(mainComplaint);
+    } else {
+        // קבלת שאלות סטנדרטיות לפי התלונה
+        standardQuestions = getStandardQuestions(mainComplaint);
+        state.cachedQuestions.set(mainComplaint, standardQuestions);
+    }
+    
+    // הכנת רשימת השאלות הסטנדרטיות - בצורה יעילה
+    const questionsList = getElement('#standard-questions-list');
+    questionsList.innerHTML = '';
+    
+    // יצירת פרגמנט לביצועים טובים
+    const questionsFragment = document.createDocumentFragment();
+    
+    if (standardQuestions.length === 0) {
+        // אם אין שאלות סטנדרטיות לתלונה זו
+        const noQuestionsItem = createElement('li', {
+            className: 'question-item',
+            text: 'אין שאלות סטנדרטיות לתלונה זו. נא לעבור לשלב הבא.'
+        });
+        questionsFragment.appendChild(noQuestionsItem);
+    } else {
+        // הוספת השאלות הסטנדרטיות
+        standardQuestions.forEach((question, index) => {
+            const questionElement = createQuestionElement(question, index, true);
+            questionsFragment.appendChild(questionElement);
+        });
+    }
+    
+    questionsList.appendChild(questionsFragment);
+    
+    // הוספת אפשרות מיקום פציעה מפורט אם רלוונטי
+    if (mainComplaint.includes("פציעה") || mainComplaint.includes("שבר") || 
+        mainComplaint.includes("נקע") || mainComplaint.includes("ספורט") ||
+        mainComplaint.includes("כאב שריר")) {
+        
+        const injurySectionContainer = createElement('div', {
+            className: 'additional-section',
+            id: 'injury-location-section'
+        });
+        
+        const injurySectionTitle = createElement('h3', {
+            text: 'פרטי מיקום הפציעה'
+        });
+        
+        injurySectionContainer.appendChild(injurySectionTitle);
+        
+        // יצירת בורר מיקום פציעה אינטראקטיבי
+        const injuryLocationSelector = createAdvancedInjuryLocationSelector();
+        injurySectionContainer.appendChild(injuryLocationSelector);
+        
+        // הוספה לפני אזור המדדים החיוניים
+        const vitalSignsContainer = getElement('#vital-signs-container');
+        vitalSignsContainer.parentNode.insertBefore(injurySectionContainer, vitalSignsContainer);
+    }
+    
+    // הוספת טופס מדדים חיוניים
+    const vitalSignsContainer = getElement('#vital-signs-container');
+    vitalSignsContainer.innerHTML = '';
+    if (relevantVitalSigns.length > 0) {
+        const vitalSignsForm = createVitalSignsForm(relevantVitalSigns);
+        vitalSignsContainer.appendChild(vitalSignsForm);
+    }
+    
+    // מעבר לשלב הבא
+    showStep(2);
+}
+/**
+ * Handling transition from step 2 to step 3
+ * Collects answers from previous step and displays dynamic questions
+ */
+async function handleStep2to3() {
+    // Collect answers from standard questions
+    const standardAnswers = collectAnswers('input[data-standard="true"], select[data-standard="true"], textarea[data-standard="true"], input[type="hidden"][data-standard="true"]');
+    
+    // Save answers in patient record
+    state.patientRecord.standardAnswers = standardAnswers;
+    
+    // Save vital signs
+    state.patientRecord.vitalSigns = collectVitalSigns();
+    
+    // Save injury location if relevant
+    const injuryLocationValue = getElement('#injury-location-value');
+    if (injuryLocationValue && injuryLocationValue.value) {
+      state.patientRecord.standardAnswers['מיקום הפציעה המדויק'] = injuryLocationValue.value;
+    }
+    
+    // Show loading animation
+    getElement('#dynamic-questions-loading').style.display = 'block';
+    getElement('#dynamic-questions-container').style.display = 'none';
+    
+    // Move to next step
+    showStep(3);
+    
+    try {
+      // Log data for debugging
+      console.log("Main complaint:", state.patientRecord.patientInfo.mainComplaint);
+      console.log("Standard answers:", standardAnswers);
+      
+      // Get dynamic questions - ensure we always get at least default questions
+      let dynamicQuestions = [];
+      
+      // First try to get local questions (this should always work)
+      dynamicQuestions = getLocalDynamicQuestions(
+        state.patientRecord.patientInfo.mainComplaint, 
+        standardAnswers
+      );
+      
+      console.log("Local dynamic questions:", dynamicQuestions);
+      
+      // If we have internet and API key, try to get AI questions
+      if (navigator.onLine && window.OPENAI_API_KEY) {
+        try {
+          const aiQuestions = await getDynamicQuestionsFromAPI(
+            state.patientRecord.patientInfo.mainComplaint,
+            standardAnswers
+          );
+          
+          if (aiQuestions && aiQuestions.length > 0) {
+            console.log("AI questions received:", aiQuestions);
+            dynamicQuestions = [...dynamicQuestions, ...aiQuestions];
+          }
+        } catch (apiError) {
+          console.warn("Failed to get AI questions:", apiError);
+          // Continue with local questions only
+        }
+      }
+      
+      // Ensure we always have at least default questions
+      if (!dynamicQuestions || dynamicQuestions.length === 0) {
+        console.warn("No dynamic questions found, using defaults");
+        dynamicQuestions = [
+          {
+            type: "multiline",
+            question: "פרט/י מידע נוסף שלדעתך חשוב לנו לדעת על התלונה העיקרית"
+          },
+          {
+            type: "scale",
+            question: "מהי עוצמת הסימפטומים בסולם 1-10?"
+          },
+          {
+            type: "yesNo",
+            question: "האם ניסית טיפול כלשהו עד כה?",
+            followUp: "איזה טיפול והאם הועיל?"
+          }
+        ];
+      }
+      
+      // Render questions to UI
+      renderDynamicQuestions(dynamicQuestions);
+      
+    } catch (error) {
+      console.error("Error loading dynamic questions:", error);
+      
+      // Show error message with detailed info
+      const questionsList = getElement('#dynamic-questions-list');
+      if (questionsList) {
+        questionsList.innerHTML = `
+          <li class="question-item error-item">
+            <div class="error-message">אירעה שגיאה בטעינת השאלות הנוספות.</div>
+            <div class="error-details">${error.message || 'שגיאה לא ידועה'}</div>
+          </li>
+        `;
+      }
+    } finally {
+      // Hide loading animation in any case
+      getElement('#dynamic-questions-loading').style.display = 'none';
+      getElement('#dynamic-questions-container').style.display = 'block';
+    }
+  }
+  
+  /**
+   * Improved local dynamic questions function with better defaults
+   */
+/**
+ * Improved local dynamic questions function with better defaults
+ */
+function getLocalDynamicQuestions(complaint, previousAnswers) {
+    // Helper function to identify symptoms in previous answers
+    const hasSymptom = (keyword) => {
+      if (!previousAnswers) return false;
+      
+      return Object.entries(previousAnswers).some(([question, answer]) => {
+        if (typeof answer !== 'string') return false;
+        if (typeof question !== 'string') return false;
+        
+        return question.toLowerCase().includes(keyword.toLowerCase()) ||
+               answer.toLowerCase().includes(keyword.toLowerCase());
+      });
+    };
+  
+    // Mapping dynamic questions by complaint type
+    const dynamicQuestionsMap = {
+      "כאב ראש": [
+        {
+          type: "yesNo",
+          question: "האם יש הפרעות ראייה?",
+          followUp: "איזה סוג של הפרעות (טשטוש, כפל ראייה)?"
+        },
+        hasSymptom('בחילה') ? {
+          type: "yesNo",
+          question: "האם הבחילות הולכות ומחמירות?",
+          followUp: "תאר את ההחמרה"
+        } : {
+          type: "yesNo",
+          question: "האם יש רגישות לריחות?",
+          followUp: "לאילו ריחות?"
+        },
+        hasSymptom('אור') ? {
+          type: "yesNo",
+          question: "האם הרגישות לאור מופיעה רק בזמן הכאב?",
+          followUp: "מתי מופיעה הרגישות לאור?"
+        } : {
+          type: "yesNo",
+          question: "האם כאב הראש מעיר אותך משינה?",
+          followUp: "באיזו תדירות?"
+        },
+        {
+          type: "multiselect",
+          question: "האם זיהית גורמים שמחמירים את הכאב?",
+          options: ["מאמץ", "לחץ נפשי", "אוכל מסוים", "אלכוהול", "קפאין", "ריחות חזקים", "תאורה חזקה"]
+        },
+        {
+          type: "multiselect",
+          question: "האם זיהית גורמים שמקלים על הכאב?",
+          options: ["מנוחה", "שינה", "חשיכה", "שקט", "תרופות", "קפאין", "אוכל"]
+        }
+      ],
+      
+      "כאב בטן": [
+        {
+          type: "multiselect",
+          question: "האם הכאב משתנה לאחר אכילה?",
+          options: ["מחמיר לאחר אכילה", "משתפר לאחר אכילה", "לא משתנה בעקבות אכילה", "תלוי בסוג המזון"]
+        },
+        {
+          type: "multiselect",
+          question: "האם הכאב מפריע לפעילויות יומיומיות?",
+          options: ["שינה", "אכילה", "עבודה", "פעילות גופנית", "לא משפיע על פעילויות"]
+        },
+        {
+          type: "multiselect",
+          question: "האם יש שינויים ביציאות?",
+          options: ["שלשול", "עצירות", "דם ביציאות", "ריר ביציאות", "יציאות רכות", "ללא שינוי"]
+        },
+        {
+          type: "yesNo",
+          question: "האם יש עליה בחום הגוף?",
+          followUp: "כמה מעלות ומתי התחיל החום?"
+        },
+        {
+          type: "yesNo",
+          question: "האם נטלת תרופות לכאב בטן?",
+          followUp: "אילו תרופות והאם הועילו?"
+        }
+      ],
+      
+      "כאב גב": [
+        {
+          type: "multiselect",
+          question: "מתי הכאב מופיע?",
+          options: ["בישיבה ממושכת", "בעמידה ממושכת", "אחרי מאמץ", "בלילה", "בבוקר", "כל הזמן"]
+        },
+        {
+          type: "yesNo",
+          question: "האם הכאב מקרין לרגליים?",
+          followUp: "לאיזה חלק ברגל (ירך, ברך, קרסול)?"
+        },
+        {
+          type: "multiselect",
+          question: "מה מקל על הכאב?",
+          options: ["מנוחה", "תנוחה מסוימת", "חימום", "קירור", "תרופות", "עיסוי", "פעילות גופנית", "שום דבר"]
+        },
+        {
+          type: "yesNo",
+          question: "האם חווית חבלה או פציעה בגב לאחרונה?",
+          followUp: "פרט/י על החבלה"
+        },
+        {
+          type: "yesNo",
+          question: "האם הכאב משפיע על תנועתיות הגב?",
+          followUp: "אילו תנועות קשות במיוחד?"
+        }
+      ],
+      
+      "כאב שרירים": [
+        {
+          type: "multiselect",
+          question: "מה אופי הכאב?",
+          options: ["חד", "מתמשך", "צורב", "פועם", "עמום", "נוקשות"]
+        },
+        {
+          type: "yesNo",
+          question: "האם ביצעת פעילות גופנית חריגה לאחרונה?",
+          followUp: "איזו פעילות ומתי?"
+        },
+        {
+          type: "multiselect",
+          question: "מה מקל על הכאב?",
+          options: ["מנוחה", "חימום", "קירור", "עיסוי", "תרופות", "מתיחות", "שום דבר"]
+        },
+        {
+          type: "yesNo",
+          question: "האם הכאב מלווה בנפיחות או אדמומיות?",
+          followUp: "באילו אזורים ניכרים הנפיחות או האדמומיות?"
+        }
+      ],
+      
+      // Default questions for all complaint types
+      "default": [
+        {
+          type: "multiselect",
+          question: "האם חל שינוי ברמת האנרגיה שלך לאחרונה?",
+          options: ["ירידה באנרגיה", "עייפות מוגברת", "קשיי שינה", "חוסר מנוחה", "אין שינוי"]
+        },
+        {
+          type: "multiselect",
+          question: "האם יש שינויים בהרגלי האכילה או השתייה שלך?",
+          options: ["ירידה בתיאבון", "עלייה בתיאבון", "צמא מוגבר", "קושי בבליעה", "אין שינוי"]
+        },
+        {
+          type: "yesNo",
+          question: "האם חווית מצבים דומים בעבר?",
+          followUp: "מתי והאם טופלו?"
+        },
+        {
+          type: "scale",
+          question: "דרג/י את עוצמת הסימפטומים בסולם מ-1 עד 10",
+        },
+        {
+          type: "yesNo",
+          question: "האם יש משהו נוסף שחשוב שנדע על מצבך הבריאותי?",
+          followUp: "פרט/י"
+        }
+      ]
+    };
+  
+    // Identify the appropriate key for the complaint
+    let questionsKey = "default";
+    
+    // Check if complaint is defined
+    if (!complaint) {
+      console.warn("No complaint specified, using default questions");
+      return dynamicQuestionsMap["default"];
+    }
+    
+    // Search for keywords in the complaint
+    if (complaint.includes("שריר")) {
+      questionsKey = "כאב שרירים";
+    } else if (complaint.includes("גב")) {
+      questionsKey = "כאב גב";
+    } else if (complaint.includes("ראש")) {
+      questionsKey = "כאב ראש";
+    } else if (complaint.includes("בטן")) {
+      questionsKey = "כאב בטן";
+    } else {
+      // Search for direct match in existing keys
+      const foundKey = Object.keys(dynamicQuestionsMap).find(key =>
+        complaint.includes(key) || key.includes(complaint)
+      );
+      
+      if (foundKey) questionsKey = foundKey;
+    }
+  
+    console.log("Selected questions key:", questionsKey);
+    
+    // Return appropriate questions or default questions
+    const questions = dynamicQuestionsMap[questionsKey] || dynamicQuestionsMap["default"];
+    
+    // Add debug log
+    console.log(`Returning ${questions.length} dynamic questions for ${questionsKey}`);
+    
+    return questions;
+  }
+  
+  /**
+   * Helper function to render dynamic questions to the UI
+   */
+  function renderDynamicQuestions(dynamicQuestions) {
+    const questionsList = getElement('#dynamic-questions-list');
+    if (!questionsList) {
+      console.error("Cannot find questions list element");
+      return;
+    }
+    
+    // Clear previous content
+    questionsList.innerHTML = '';
+    
+    // Create a fragment for better performance
+    const questionsFragment = document.createDocumentFragment();
+    
+    console.log(`Rendering ${dynamicQuestions?.length || 0} questions`);
+    
+    // Check if there are questions
+    if (!dynamicQuestions || dynamicQuestions.length === 0) {
+      const noQuestionsItem = createElement('li', {
+        className: 'question-item',
+        text: 'אין שאלות נוספות לתלונה זו. נא לעבור לשלב הבא.'
+      });
+      questionsFragment.appendChild(noQuestionsItem);
+    } else {
+      // Create an element for each question
+      dynamicQuestions.forEach((question, index) => {
+        if (!question) {
+          console.warn(`Invalid question at index ${index}`);
+          return;
+        }
+        
+        try {
+          const questionElement = createQuestionElement(question, index, false);
+          questionsFragment.appendChild(questionElement);
+        } catch (error) {
+          console.error(`Error creating question element for question ${index}:`, error, question);
+          
+          // Create a simple fallback element instead
+          const fallbackElement = createElement('li', {
+            className: 'question-item error-item',
+            html: `<div class="question-header">${question.question || 'שאלה לא תקינה'}</div>
+                   <div class="answer-container">
+                     <div class="error-message">שגיאה ביצירת שאלה זו</div>
+                   </div>`
+          });
+          questionsFragment.appendChild(fallbackElement);
+        }
+      });
+    }
+    
+    // Add free text field at the end of the questionnaire
+    const freeTextContainer = createFreeTextArea();
+    questionsFragment.appendChild(freeTextContainer);
+    
+    // Add all questions at once
+    questionsList.appendChild(questionsFragment);
+  }
+  
+  /**
+   * Simpler function to get questions from API
+   */
+  async function getDynamicQuestionsFromAPI(complaint, previousAnswers) {
+    try {
+      console.log("Attempting to get questions from API");
+      
+      // Send request to server
+      const response = await fetch('/api/get-dynamic-questions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ complaint, previousAnswers })
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Server error: ${response.status}`);
+      }
+      
+      const result = await response.json();
+      
+      if (result.success && result.questions && result.questions.length > 0) {
+        return result.questions;
+      }
+      
+      return [];
+    } catch (error) {
+      console.error("Error getting questions from API:", error);
+      return [];
+    }
+  }
+  
+
+
+
+function handleStep3to4() {
+    // איסוף תשובות לשאלות דינמיות
+    const dynamicAnswers = collectAnswers('input[data-dynamic="true"], select[data-dynamic="true"], textarea[data-dynamic="true"], input[type="hidden"][data-dynamic="true"]');
+    
+    // שמירת התשובות ברשומת המטופל
+    state.patientRecord.dynamicAnswers = dynamicAnswers;
+    
+    // הצגת אנימציית טעינה
+    getElement('#summary-loading').style.display = 'block';
+    getElement('#summary-container').style.display = 'none';
+    
+    // מעבר לשלב הבא
+    showStep(4);
+    
+    // יצירת סיכום אנמנזה - שיפור: ניצול תהליך אסינכרוני
+    generateSummary(state.patientRecord)
+        .then(patientRecord => {
+            state.patientRecord = patientRecord;
+            
+            // הצגת הסיכום במסך
+            getElement('#summary-text').textContent = patientRecord.summary;
+            
+            // הדגשת דגלים אדומים
+            highlightRedFlags();
+            
+            // הסתרת אנימציית הטעינה והצגת הסיכום
+            getElement('#summary-loading').style.display = 'none';
+            getElement('#summary-container').style.display = 'block';
+        })
+        .catch(error => {
+            console.error("שגיאה ביצירת סיכום:", error);
+            showToast('error', 'אירעה שגיאה ביצירת הסיכום');
+            
+            // הצגת סיכום בסיסי במקרה של כישלון
+            const basicSummary = `סיכום בסיסי של המטופל/ת: ${state.patientRecord.patientInfo.age} שנים, עם תלונה עיקרית של ${state.patientRecord.patientInfo.mainComplaint}.`;
+            getElement('#summary-text').textContent = basicSummary;
+            
+            // הסתרת אנימציית הטעינה והצגת הסיכום
+            getElement('#summary-loading').style.display = 'none';
+            getElement('#summary-container').style.display = 'block';
+        });
+}
+
+function handleCopySummary() {
+    const summaryText = getElement('#summary-text').textContent;
+    
+    // העתקה ללוח - ממוטב בעזרת מודל הבטחות
+    navigator.clipboard.writeText(summaryText)
+        .then(() => {
+            // אנימציה להצלחת ההעתקה
+            this.classList.add('copy-success');
+            
+            // הודעת הצלחה
+            showToast('success', 'הסיכום הועתק בהצלחה');
+            
+            // החזרת הטקסט המקורי אחרי 2 שניות
+            setTimeout(() => {
+                this.classList.remove('copy-success');
+            }, 2000);
+        })
+        .catch(err => {
+            console.error('שגיאה בהעתקה:', err);
+            showToast('error', 'שגיאה בהעתקה. נסה שוב.');
+        });
+}
+
+function handleCompleteSummary() {
+    // העבר ישירות לשלב 5 (סיום)
+    getElement('#final-summary-text').textContent = state.patientRecord.summary;
+    
+    // הוסף יכולת העתקה גם בשלב הסיום
+    highlightRedFlagsInFinalSummary();
+    
+    showStep(5);
+    
+    // איפוס דגל השינויים
+    state.unsavedChanges = false;
+}
+
+function handleSendSummary() {
+    // בדיקה אם הוזן דוא"ל
+    const doctorEmail = getElement('#doctor-email').value.trim();
+    
+    // בדיקת תקינות הדוא"ל אם הוזן
+    if (doctorEmail && !isValidEmail(doctorEmail)) {
+        showToast('error', 'כתובת דואר אלקטרוני לא תקינה');
+        return;
+    }
+    
+    // העברה לשלב 5 עם הסיכום
+    getElement('#final-summary-text').textContent = state.patientRecord.summary;
+    
+    // הוסף יכולת העתקה גם בשלב הסיום
+    highlightRedFlagsInFinalSummary();
+    
+    // התקדם לשלב הסיום
+    showStep(5);
+    
+    // סימולציית שליחה אם הוזן דוא"ל
+    if (doctorEmail) {
+        // הצגת הודעת טעינת שליחה
+        const sendingToast = showToast('sending', `שולח סיכום לכתובת ${doctorEmail}...`);
+        
+        // סימולציית שליחה
+        setTimeout(() => {
+            // הסרת הודעת השליחה אם קיימת
+            if (document.body.contains(sendingToast)) {
+                document.body.removeChild(sendingToast);
+            }
+            
+            // הצגת הודעת הצלחה
+            showToast('success', `הסיכום נשלח בהצלחה לכתובת: ${doctorEmail}`);
+            
+            // איפוס דגל השינויים
+            state.unsavedChanges = false;
+        }, 2000);
+    } else {
+        // איפוס דגל השינויים
+        state.unsavedChanges = false;
+    }
+}
+
+function handleCopyFinalSummary() {
+    const summaryText = getElement('#final-summary-text').textContent;
+    
+    // העתקה ללוח - ממוטב
+    navigator.clipboard.writeText(summaryText)
+        .then(() => {
+            // אנימציה להצלחת ההעתקה
+            this.classList.add('copy-success');
+            
+            // הודעת הצלחה
+            showToast('success', 'הסיכום הועתק בהצלחה');
+            
+            // החזרת הטקסט המקורי אחרי 2 שניות
+            setTimeout(() => {
+                this.classList.remove('copy-success');
+            }, 2000);
+        })
+        .catch(err => {
+            console.error('שגיאה בהעתקה:', err);
+            showToast('error', 'שגיאה בהעתקה. נסה שוב.');
+        });
+}
+
+function handlePrintSummary() {
+    // הכנת גרסת הדפסה
+    const printWindow = window.open('', '_blank');
+    
+    // יצירת HTML מותאם להדפסה
+    const printContent = `
+        <!DOCTYPE html>
+        <html lang="he" dir="rtl">
+        <head>
+            <meta charset="UTF-8">
+            <title>סיכום רפואי להדפסה</title>
+            <style>
+                body {
+                    font-family: Arial, sans-serif;
+                    line-height: 1.6;
+                    padding: 20px;
+                    direction: rtl;
+                }
+                h1 {
+                    text-align: center;
+                    margin-bottom: 20px;
+                    color: #0056b3;
+                }
+                .header {
+                    border-bottom: 2px solid #0056b3;
+                    padding-bottom: 10px;
+                    margin-bottom: 20px;
+                }
+                .summary {
+                    white-space: pre-line;
+                    margin-bottom: 30px;
+                    font-size: 14px;
+                }
+                .red-flag {
+                    background-color: #fff0f0;
+                    border-right: 4px solid #dc3545;
+                    padding: 10px;
+                    margin: 10px 0;
+                }
+                .treatment-recommendations {
+                    background-color: #f0fff0;
+                    border-right: 4px solid #28a745;
+                    padding: 10px;
+                    margin: 10px 0;
+                }
+                .footer {
+                    margin-top: 30px;
+                    border-top: 1px solid #ddd;
+                    padding-top: 10px;
+                    font-size: 12px;
+                    color: #666;
+                    text-align: center;
+                }
+                @media print {
+                    body { font-size: 12pt; }
+                    .no-print { display: none; }
+                }
+            </style>
+        </head>
+        <body>
+            <div class="header">
+                <h1>סיכום רפואי</h1>
+                <p>תאריך: ${new Date().toLocaleDateString('he-IL')}</p>
+            </div>
+            <div class="summary">
+                ${getElement('#final-summary-text').innerHTML}
+            </div>
+            <div class="footer">
+                <p>מסמך זה הופק באמצעות מערכת איסוף נתונים רפואיים</p>
+            </div>
+            <div class="no-print">
+                <button onclick="window.print()">להדפסה לחץ כאן</button>
+            </div>
+        </body>
+        </html>
+    `;
+    
+    printWindow.document.open();
+    printWindow.document.write(printContent);
+    printWindow.document.close();
+    
+    // הדפסה אוטומטית אחרי טעינת החלון
+    printWindow.addEventListener('load', function() {
+        printWindow.focus();
+        setTimeout(() => printWindow.print(), 500);
+    });
+}
+
+function handleExportPdf() {
+    showToast('info', 'מייצא סיכום כקובץ PDF...');
+    
+    // סימולציית ייצוא
+    setTimeout(() => {
+        showToast('success', 'הסיכום יוצא בהצלחה כקובץ PDF');
+    }, 1500);
+}
+
+/**
+ * פונקציה לקבלת שאלות סטנדרטיות לפי תלונה
+ * @param {string} complaint - התלונה העיקרית
+ * @returns {Array} - רשימת שאלות מותאמות לתלונה
+ */
+function getStandardQuestions(complaint) {
+    // שאלות סטנדרטיות לפי תלונה
+    const standardQuestionsMap = {
+        "כאב גרון": [
+            {
+                type: "duration",
+                question: "כמה זמן נמשך הכאב בגרון?",
+                placeholder: "יום / יומיים / שבוע..."
+            },
+            {
+                type: "yesNo",
+                question: "האם יש לך חום?",
+                followUp: "מה גובה החום ומתי נמדד לאחרונה?"
+            },
+            {
+                type: "multiselect",
+                question: "סימפטומים נלווים",
+                options: ["שיעול", "נזלת", "גודש באף", "כאב באוזניים", "צרידות", "קשיי בליעה"]
+            },
+            {
+                type: "yesNo",
+                question: "האם לקחת תרופות להקלה?",
+                followUp: "אילו תרופות והאם הן עזרו?"
+            }
+        ],
+        "כאב ראש": [
+            {
+                type: "duration",
+                question: "כמה זמן נמשך כאב הראש?",
+                placeholder: "שעות / ימים / שבועות"
+            },
+            {
+                type: "multiselect",
+                question: "היכן ממוקם הכאב?",
+                options: ["מצח", "רקות", "עורף", "צד ימין", "צד שמאל", "כל הראש"]
+            },
+            {
+                type: "multiselect",
+                question: "מהו אופי הכאב?",
+                options: ["לוחץ", "פועם", "דוקר", "צורב", "מתמשך", "משתנה בעוצמה"]
+            },
+            {
+                type: "scale",
+                question: "מהי עוצמת הכאב בסולם 1-10?",
+                placeholder: "דרג מ-1 (קל) עד 10 (חמור ביותר)"
+            },
+            {
+                type: "multiselect",
+                question: "האם יש סימפטומים נלווים?",
+                options: ["בחילה", "הקאות", "רגישות לאור", "רגישות לרעש", "סחרחורת", "טשטוש ראייה"]
+            }
+        ],
+        "כאב בטן": [
+            {
+                type: "duration",
+                question: "כמה זמן נמשך כאב הבטן?",
+                placeholder: "שעות / ימים / שבועות"
+            },
+            {
+                type: "multiselect",
+                question: "היכן ממוקם הכאב?",
+                options: ["בטן עליונה", "בטן תחתונה", "צד ימין", "צד שמאל", "סביב הטבור", "כל הבטן"]
+            },
+            {
+                type: "scale",
+                question: "מהי עוצמת הכאב בסולם 1-10?",
+                placeholder: "דרג מ-1 (קל) עד 10 (חמור ביותר)"
+            },
+            {
+                type: "yesNo",
+                question: "האם יש שינויים ביציאות?",
+                followUp: "איזה סוג של שינויים (שלשול/עצירות)?"
+            }
+        ],
+        // שאלות כלליות לכל תלונה אחרת
+        "default": [
+            {
+                type: "duration",
+                question: "כמה זמן נמשכים הסימפטומים?",
+                placeholder: "שעות / ימים / שבועות..."
+            },
+            {
+                type: "scale",
+                question: "מהי עוצמת הסימפטומים בסולם 1-10?",
+                placeholder: "דרג מ-1 (קל) עד 10 (חמור ביותר)"
+            },
+            {
+                type: "yesNo",
+                question: "האם ניסית טיפול כלשהו עד כה?",
+                followUp: "איזה טיפול והאם הועיל?"
+            },
+            {
+                type: "yesNo",
+                question: "האם יש סימפטומים נוספים מלבד התלונה העיקרית?",
+                followUp: "אילו סימפטומים נוספים?"
+            }
+        ]
+    };
+    
+    // חיפוש שאלות לפי תלונה
+    let questionsKey = "default";
+    
+    // חיפוש התאמות תלונה לפי מילות מפתח
+    if (complaint.includes("ראש")) {
+        questionsKey = "כאב ראש";
+    } else if (complaint.includes("בטן")) {
+        questionsKey = "כאב בטן";
+    } else if (complaint.includes("גרון")) {
+        questionsKey = "כאב גרון";
+    } else {
+        // חיפוש התאמה ישירה
+        questionsKey = Object.keys(standardQuestionsMap).find(key => 
+            complaint.includes(key) || key.includes(complaint)
+        ) || "default";
+    }
+    
+    return standardQuestionsMap[questionsKey] || standardQuestionsMap["default"];
+}
 function createMultiSelectInput(container, questionData, questionId, index, isStandard) {
     const multiSelectContainer = createElement('div', {
         className: 'multiselect-container'
@@ -2281,6 +3216,47 @@ function createApiStatusIndicator() {
     return indicator;
   }
 function initializeApplication() {
+    // להוסיף בתוך פונקציית initializeApplication, אחרי אתחול הכפתורים האחרים
+
+// הוספת מאזיני אירועים לבחירת מגדר
+    document.querySelectorAll('.gender-option').forEach(option => {
+        option.addEventListener('click', function() {
+            // הסרת סימון מכל האפשרויות
+            document.querySelectorAll('.gender-option').forEach(opt => {
+                opt.classList.remove('selected');
+            });
+            
+            // סימון האפשרות שנבחרה
+            this.classList.add('selected');
+            
+            // עדכון ערך הקלט החבוי
+            const genderInput = document.getElementById('gender-value');
+            if (genderInput) {
+                genderInput.value = this.dataset.value;
+                state.unsavedChanges = true;
+            }
+        });
+    });
+
+// הוספת מאזיני אירועים לבחירת פרופיל רפואי
+    document.querySelectorAll('.profile-card').forEach(card => {
+        card.addEventListener('click', function() {
+            // הסרת סימון מכל האפשרויות
+            document.querySelectorAll('.profile-card').forEach(c => {
+                c.classList.remove('selected');
+            });
+            
+            // סימון האפשרות שנבחרה
+            this.classList.add('selected');
+            
+            // עדכון ערך הקלט החבוי
+            const profileInput = document.getElementById('profile-value');
+            if (profileInput) {
+                profileInput.value = this.dataset.value;
+                state.unsavedChanges = true;
+            }
+        });
+    });
     // הוספת אינדיקטור מצב API
     const header = document.querySelector('header');
     if (header) {
@@ -2477,271 +3453,164 @@ function initializeNavigationButtons() {
  * טיפול במעבר משלב 1 לשלב 2
  * אוסף נתוני פרופיל ותלונה עיקרית ומכין את שלב השאלות
  */
-function handleStep1to2() {
-    // איסוף נתוני הפרופיל הרפואי
-    const profile = getSelectedRadioValue('profile');
-    const medicalSections = getElement('#medical-sections').value.trim();
-    
-    // בדיקה והכנת אלרגיות
-    const hasAllergies = getSelectedRadioValue('allergies') === 'yes';
-    let allergiesDetails = "ללא אלרגיות ידועות";
-    if (hasAllergies) {
-        allergiesDetails = getElement('#allergies-details').value.trim();
-        if (!allergiesDetails) {
-            showToast('error', 'נא לפרט את האלרגיות');
-            return;
+
+// להוסיף את הקוד הבא בתוך initializeApplication(), לאחר שורה ~102 (הקוד של "מילוי רשימת התלונות הנפוצות")
+
+// הוספת מאזיני אירועים לבחירת מגדר
+document.querySelectorAll('.gender-option').forEach(option => {
+    option.addEventListener('click', function() {
+        // הסרת סימון מכל האפשרויות
+        document.querySelectorAll('.gender-option').forEach(opt => {
+            opt.classList.remove('selected');
+        });
+        
+        // סימון האפשרות שנבחרה
+        this.classList.add('selected');
+        
+        // עדכון ערך הקלט החבוי
+        const genderInput = document.getElementById('gender-value');
+        if (genderInput) {
+            genderInput.value = this.dataset.value;
+            state.unsavedChanges = true;
         }
-    }
-    
-    // בדיקה והכנת תרופות
-    const takesMedications = getSelectedRadioValue('medications') === 'yes';
-    let medicationsDetails = "לא נוטל תרופות באופן קבוע";
-    if (takesMedications) {
-        medicationsDetails = getElement('#medications-details').value.trim();
-        if (!medicationsDetails) {
-            showToast('error', 'נא לפרט את התרופות');
-            return;
+    });
+});
+
+// הוספת מאזיני אירועים לבחירת פרופיל רפואי
+document.querySelectorAll('.profile-card').forEach(card => {
+    card.addEventListener('click', function() {
+        // הסרת סימון מכל האפשרויות
+        document.querySelectorAll('.profile-card').forEach(c => {
+            c.classList.remove('selected');
+        });
+        
+        // סימון האפשרות שנבחרה
+        this.classList.add('selected');
+        
+        // עדכון ערך הקלט החבוי
+        const profileInput = document.getElementById('profile-value');
+        if (profileInput) {
+            profileInput.value = this.dataset.value;
+            state.unsavedChanges = true;
         }
-    }
-    
-    // בדיקה והכנת עישון
-    const isSmoking = getSelectedRadioValue('smoking') === 'yes';
-    let smokingDetails = "לא מעשן";
-    if (isSmoking) {
-        smokingDetails = getElement('#smoking-details').value.trim();
-        smokingDetails = smokingDetails ? `מעשן, ${smokingDetails}` : "מעשן";
-    }
-    
-    // וידוא שכל השדות הנדרשים מולאו
-    const age = getElement('#patient-age').value;
-    const gender = getSelectedRadioValue('gender');
-    const mainComplaintSelect = getElement('#main-complaint');
-    let mainComplaint = mainComplaintSelect.value;
-    
-    // בדיקת תקינות הנתונים
-    if (!age || age < 0 || age > 120) {
-        showToast('error', 'יש להזין גיל תקין (0-120)');
-        return;
-    }
-    
-    if (!gender) {
-        showToast('error', 'יש לבחור מין');
-        return;
-    }
-    
-    if (!mainComplaint) {
-        showToast('error', 'יש לבחור תלונה עיקרית');
-        return;
-    }
-    
-    // אם נבחר "אחר", לקחת את הערך מהשדה הנוסף
-    if (mainComplaint === 'אחר') {
-        const otherComplaint = getElement('#other-complaint').value.trim();
-        if (!otherComplaint) {
-            showToast('error', 'יש לפרט את התלונה האחרת');
-            return;
+    });
+});
+// להחליף את הפונקציה handleStep2to3 הקיימת עם הפונקציה הזו:
+// להוסיף בסוף הקובץ app.js, לפני document.addEventListener('DOMContentLoaded', ...)
+
+// הגדרת אובייקט MedicalDataSystem אם הוא לא קיים
+if (typeof window.MedicalDataSystem === 'undefined') {
+    window.MedicalDataSystem = {
+        getDynamicQuestions: function(complaint, previousAnswers) {
+            // פונקציית עזר משופרת לבדיקת תשובות
+            const hasSymptom = (keyword) => {
+                return Object.entries(previousAnswers).some(([question, answer]) => 
+                  (question.toLowerCase().includes(keyword.toLowerCase()) || 
+                   answer.toLowerCase().includes(keyword.toLowerCase())) &&
+                  answer.toLowerCase().includes('כן')
+                );
+            };
+            
+            // מיפוי שאלות המשך מותאמות לפי סוג התלונה ותשובות קודמות
+            const dynamicQuestionsMap = {
+                "כאב ראש": [
+                    {
+                        type: "yesNo",
+                        question: "האם יש הפרעות ראייה?",
+                        followUp: "איזה סוג של הפרעות (טשטוש, כפל ראייה)?"
+                    },
+                    hasSymptom('בחילה') ? {
+                        type: "yesNo",
+                        question: "האם הבחילות הולכות ומחמירות?",
+                        followUp: "תאר את ההחמרה"
+                    } : {
+                        type: "yesNo",
+                        question: "האם יש רגישות לריחות?",
+                        followUp: "לאילו ריחות?"
+                    },
+                    hasSymptom('אור') ? {
+                        type: "yesNo",
+                        question: "האם הרגישות לאור מופיעה רק בזמן הכאב?",
+                        followUp: "מתי מופיעה הרגישות לאור?"
+                    } : {
+                        type: "yesNo",
+                        question: "האם כאב הראש מעיר אותך משינה?",
+                        followUp: "באיזו תדירות?"
+                    },
+                    {
+                        type: "yesNo",
+                        question: "האם הכאב החל לאחר מאמץ או אירוע מסוים?",
+                        followUp: "תאר את האירוע"
+                    }
+                ],
+                "כאב בטן": [
+                    hasSymptom('שלשול') ? {
+                        type: "quantity",
+                        question: "כמה יציאות ביום?",
+                        placeholder: "מספר משוער של יציאות"
+                    } : {
+                        type: "yesNo",
+                        question: "האם יש עצירות?",
+                        followUp: "מתי הייתה היציאה האחרונה?"
+                    },
+                    {
+                        type: "yesNo",
+                        question: "האם הכאב קשור לאכילה?",
+                        followUp: "האם מופיע לפני, בזמן או אחרי אכילה?"
+                    },
+                    {
+                        type: "yesNo",
+                        question: "האם יש שינוי בצבע היציאות?",
+                        followUp: "מהו הצבע?"
+                    },
+                    {
+                        type: "yesNo",
+                        question: "האם הכאב מקרין לאזורים אחרים?",
+                        followUp: "לאן הכאב מקרין?"
+                    }
+                ],
+                "default": [
+                    {
+                        type: "yesNo",
+                        question: "האם חל שינוי ברמת האנרגיה שלך לאחרונה?",
+                        followUp: "תאר את השינוי"
+                    },
+                    {
+                        type: "yesNo",
+                        question: "האם יש שינויים בהרגלי האכילה או השתייה שלך?",
+                        followUp: "איזה שינויים?"
+                    },
+                    {
+                        type: "yesNo",
+                        question: "האם יש לך מחלות כרוניות?",
+                        followUp: "אילו מחלות?"
+                    },
+                    {
+                        type: "yesNo",
+                        question: "האם חווית מצבים דומים בעבר?",
+                        followUp: "מתי והאם טופלו?"
+                    }
+                ]
+            };
+            
+            // לוגיקה דומה למה שמופיע ב-medicalDataSystem.js
+            let questionsKey = "default";
+            
+            if (complaint.includes("ראש")) {
+                questionsKey = "כאב ראש";
+            } else if (complaint.includes("בטן")) {
+                questionsKey = "כאב בטן";
+            }
+            
+            return dynamicQuestionsMap[questionsKey] || dynamicQuestionsMap["default"];
         }
-        mainComplaint = otherComplaint;
-    }
-    
-    // יצירת רשומת מטופל חדשה
-    state.patientRecord = {
-        patientInfo: {
-            age: parseInt(age),
-            gender: gender,
-            mainComplaint: mainComplaint,
-            timestamp: new Date().toISOString(),
-            profile: profile,
-            medicalSections: medicalSections || "ללא סעיפים",
-            allergies: hasAllergies ? allergiesDetails : "ללא אלרגיות ידועות",
-            medications: takesMedications ? medicationsDetails : "לא נוטל תרופות באופן קבוע",
-            smoking: isSmoking ? "yes" : "no"
-        },
-        standardAnswers: {},
-        dynamicAnswers: {},
-        vitalSigns: {},
-        summary: ""
     };
-    
-    // קבלת מדדים חיוניים רלוונטיים לתלונה
-    const relevantVitalSigns = getRelevantVitalSigns(mainComplaint);
-    
-    // בדיקת מטמון שאלות - לשיפור ביצועים
-    let standardQuestions;
-    if (state.cachedQuestions.has(mainComplaint)) {
-        standardQuestions = state.cachedQuestions.get(mainComplaint);
-    } else {
-        // קבלת שאלות סטנדרטיות לפי התלונה
-        standardQuestions = getStandardQuestions(mainComplaint);
-        state.cachedQuestions.set(mainComplaint, standardQuestions);
-    }
-    
-    // הכנת רשימת השאלות הסטנדרטיות - בצורה יעילה
-    const questionsList = getElement('#standard-questions-list');
-    questionsList.innerHTML = '';
-    
-    // יצירת פרגמנט לביצועים טובים
-    const questionsFragment = document.createDocumentFragment();
-    
-    if (standardQuestions.length === 0) {
-        // אם אין שאלות סטנדרטיות לתלונה זו
-        const noQuestionsItem = createElement('li', {
-            className: 'question-item',
-            text: 'אין שאלות סטנדרטיות לתלונה זו. נא לעבור לשלב הבא.'
-        });
-        questionsFragment.appendChild(noQuestionsItem);
-    } else {
-        // הוספת השאלות הסטנדרטיות
-        standardQuestions.forEach((question, index) => {
-            const questionElement = createQuestionElement(question, index, true);
-            questionsFragment.appendChild(questionElement);
-        });
-    }
-    
-    questionsList.appendChild(questionsFragment);
-    
-    // הוספת אפשרות מיקום פציעה מפורט אם רלוונטי
-    if (mainComplaint.includes("פציעה") || mainComplaint.includes("שבר") || 
-        mainComplaint.includes("נקע") || mainComplaint.includes("ספורט") ||
-        mainComplaint.includes("כאב שריר")) {
-        
-        const injurySectionContainer = createElement('div', {
-            className: 'additional-section',
-            id: 'injury-location-section'
-        });
-        
-        const injurySectionTitle = createElement('h3', {
-            text: 'פרטי מיקום הפציעה'
-        });
-        
-        injurySectionContainer.appendChild(injurySectionTitle);
-        
-        // יצירת בורר מיקום פציעה אינטראקטיבי
-        const injuryLocationSelector = createAdvancedInjuryLocationSelector();
-        injurySectionContainer.appendChild(injuryLocationSelector);
-        
-        // הוספה לפני אזור המדדים החיוניים
-        const vitalSignsContainer = getElement('#vital-signs-container');
-        vitalSignsContainer.parentNode.insertBefore(injurySectionContainer, vitalSignsContainer);
-    }
-    
-    // הוספת טופס מדדים חיוניים
-    const vitalSignsContainer = getElement('#vital-signs-container');
-    vitalSignsContainer.innerHTML = '';
-    if (relevantVitalSigns.length > 0) {
-        const vitalSignsForm = createVitalSignsForm(relevantVitalSigns);
-        vitalSignsContainer.appendChild(vitalSignsForm);
-    }
-    
-    // מעבר לשלב הבא
-    showStep(2);
 }
 
 /**
  * טיפול במעבר משלב 2 לשלב 3
  * אוסף תשובות סטנדרטיות ומכין שאלות המשך דינמיות
  */
-function handleStep2to3() {
-    // איסוף תשובות לשאלות סטנדרטיות
-    const standardAnswers = collectAnswers('input[data-standard="true"], select[data-standard="true"], textarea[data-standard="true"], input[type="hidden"][data-standard="true"]');
-    
-    // שמירת התשובות ברשומת המטופל
-    state.patientRecord.standardAnswers = standardAnswers;
-    
-    // שמירת מדדים חיוניים
-    state.patientRecord.vitalSigns = collectVitalSigns();
-    
-    // שמירת מיקום פציעה אם רלוונטי
-    const injuryLocationValue = getElement('#injury-location-value');
-    if (injuryLocationValue && injuryLocationValue.value) {
-        state.patientRecord.standardAnswers['מיקום הפציעה המדויק'] = injuryLocationValue.value;
-    }
-    
-    // הצגת אנימציית טעינה
-    getElement('#dynamic-questions-loading').style.display = 'block';
-    getElement('#dynamic-questions-container').style.display = 'none';
-    
-    // מעבר לשלב הבא
-    showStep(3);
-    
-    // ייעול התהליך - יצירת שאלות דינמיות רק לאחר סיום מעבר ה-DOM
-    setTimeout(() => {
-        let dynamicQuestions = [];
-        
-        // בדיקה אם מדובר בפציעת ספורט או שריר ושימוש בשאלות ייעודיות
-        if (state.patientRecord.patientInfo.mainComplaint.includes("פציעת ספורט") || 
-            state.patientRecord.patientInfo.mainComplaint.includes("כאב שריר") ||
-            state.patientRecord.patientInfo.mainComplaint.includes("פציעת שריר")) {
-            dynamicQuestions = createSportsInjuryQuestions();
-        } else {
-            // בדיקת מטמון
-            const cacheKey = state.patientRecord.patientInfo.mainComplaint;
-            if (state.cachedQuestions.has(`dynamic_${cacheKey}`)) {
-                dynamicQuestions = state.cachedQuestions.get(`dynamic_${cacheKey}`);
-            } else {
-                dynamicQuestions = getDynamicQuestions(
-                    state.patientRecord.patientInfo.mainComplaint, 
-                    standardAnswers
-                );
-                state.cachedQuestions.set(`dynamic_${cacheKey}`, dynamicQuestions);
-            }
-        }
-        
-        // יצירת אלמנטי שאלות דינמיות
-        const questionsList = getElement('#dynamic-questions-list');
-        questionsList.innerHTML = '';
-        
-        // יצירת פרגמנט לביצועים טובים
-        const questionsFragment = document.createDocumentFragment();
-        
-        if (dynamicQuestions.length === 0) {
-            const noQuestionsItem = createElement('li', {
-                className: 'question-item',
-                text: 'אין שאלות נוספות לתלונה זו. נא לעבור לשלב הבא.'
-            });
-            questionsFragment.appendChild(noQuestionsItem);
-        } else {
-            dynamicQuestions.forEach((question, index) => {
-                const questionElement = createQuestionElement(question, index, false);
-                questionsFragment.appendChild(questionElement);
-            });
-        }
-        
-        // הוספת אפשרות להערות חופשיות
-        const freeTextContainer = createElement('div', {
-            className: 'free-notes-container'
-        });
-        
-        const freeTextTitle = createElement('h3', {
-            text: 'מידע נוסף'
-        });
-        
-        const freeTextArea = createElement('textarea', {
-            className: 'free-text-area',
-            rows: 5,
-            placeholder: 'הוסף כל מידע נוסף שלא נכלל בשאלות הקודמות...',
-            dataset: {
-                question: 'מידע נוסף',
-                dynamic: 'true',
-                type: 'multiline'
-            },
-            events: {
-                input: () => { state.unsavedChanges = true; }
-            }
-        });
-        
-        freeTextContainer.appendChild(freeTextTitle);
-        freeTextContainer.appendChild(freeTextArea);
-        questionsFragment.appendChild(freeTextContainer);
-        
-        // הוספת כל השאלות במהלך אחד לצמצום reflows
-        questionsList.appendChild(questionsFragment);
-        
-        // הסתרת אנימציית הטעינה והצגת השאלות
-        getElement('#dynamic-questions-loading').style.display = 'none';
-        getElement('#dynamic-questions-container').style.display = 'block';
-    }, 100); // דחייה מינימלית לשיפור חוויית המשתמש
-}
 
 /**
  * טיפול במעבר משלב 3 לשלב 4
@@ -3011,6 +3880,7 @@ function handleExportPdf() {
  * פונקציות קבלת שאלות סטנדרטיות ודינמיות
  * (ממוטבות לשימוש בשאלות המותאמות למשרד רפואי)
  */
+
 function getStandardQuestions(complaint) {
     // פונקציה זו יכולה לטעון שאלות מהשרת בסביבת ייצור
     // במצב פיתוח/דמו, נשתמש בנתונים קבועים
@@ -3584,56 +4454,7 @@ async function getDynamicQuestions(complaint, previousAnswers) {
    * טיפול במעבר משלב 2 לשלב 3
    * איסוף תשובות מהשלב הקודם והצגת שאלות דינמיות
    */
-  async function handleStep2to3() {
-    // איסוף תשובות מהשאלות הסטנדרטיות
-    const standardAnswers = collectAnswers('input[data-standard="true"], select[data-standard="true"], textarea[data-standard="true"], input[type="hidden"][data-standard="true"]');
-    
-    // שמירת התשובות ברשומת המטופל
-    state.patientRecord.standardAnswers = standardAnswers;
-    
-    // שמירת מדדים חיוניים
-    state.patientRecord.vitalSigns = collectVitalSigns();
-    
-    // שמירת מיקום פציעה אם קיים
-    const injuryLocationValue = getElement('#injury-location-value');
-    if (injuryLocationValue && injuryLocationValue.value) {
-      state.patientRecord.standardAnswers['מיקום הפציעה המדויק'] = injuryLocationValue.value;
-    }
-    
-    // הצגת אנימציית טעינה
-    getElement('#dynamic-questions-loading').style.display = 'block';
-    getElement('#dynamic-questions-container').style.display = 'none';
-    
-    // מעבר לשלב הבא
-    showStep(3);
-    
-    try {
-      // קבלת שאלות דינמיות
-      const dynamicQuestions = await getDynamicQuestions(
-        state.patientRecord.patientInfo.mainComplaint, 
-        standardAnswers
-      );
-      
-      // יצירת אלמנטי השאלות
-      renderDynamicQuestions(dynamicQuestions);
-      
-    } catch (error) {
-      console.error("שגיאה בטעינת שאלות דינמיות:", error);
-      
-      // הצגת הודעת שגיאה
-      const questionsList = getElement('#dynamic-questions-list');
-      questionsList.innerHTML = `
-        <li class="question-item error-item">
-          <div class="error-message">אירעה שגיאה בטעינת שאלות נוספות. נא לנסות שוב או להמשיך לשלב הבא.</div>
-          <div class="error-details">${error.message}</div>
-        </li>
-      `;
-    } finally {
-      // הסתרת אנימציית הטעינה בכל מקרה
-      getElement('#dynamic-questions-loading').style.display = 'none';
-      getElement('#dynamic-questions-container').style.display = 'block';
-    }
-  }
+
   
   /**
    * רינדור שאלות דינמיות לממשק המשתמש
