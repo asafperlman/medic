@@ -2154,8 +2154,7 @@ function createDetailedMedicalSummary(patientRecord, includeRecommendations = fa
         const genderText = gender === 'male' ? 'זכר' : 'נקבה';
         
         return `פרופיל ${profile}, ${medicalSections || "ללא סעיפים"}, ${allergies || "ללא אלרגיות ידועות"}, ${medications || "לא נוטל/ת תרופות באופן קבוע"}.\n\nמטופל/ת בן/בת ${age}, ${genderText}, ${smoking === 'yes' ? 'מעשן/ת' : 'לא מעשן/ת'}, פונה עם תלונה עיקרית של ${mainComplaint}.\n\nלא ניתן היה להפיק סיכום מפורט בשל בעיה טכנית.`;
-    }
-}
+    }}
 // ======== אתחול המערכת והתחלת האפליקציה ========
 
 /**
