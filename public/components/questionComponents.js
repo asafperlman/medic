@@ -558,6 +558,77 @@ function highlightSelectedOption(optionElement, isSelected) {
  * @param {string} type - סוג הקלט
  * @param {HTMLElement} container - אלמנט המכיל
  */
+
+/**
+ * יצירת שדה בחירת מיקום משופר
+ * @param {HTMLElement} container - האלמנט המכיל
+ * @param {object} questionData - נתוני השאלה 
+ * @param {string} questionId - מזהה השאלה
+ * @param {number} index - אינדקס השאלה
+ * @param {boolean} isStandard - האם שאלה סטנדרטית
+ */
+function createLocationInput(container, questionData, questionId, index, isStandard) {
+    const locationContainer = createElement('div', {
+      className: 'location-container'
+    });
+    
+    // יצירת שדה חבוי לשמירת ערך
+    const hiddenInput = createElement('input', {
+      type: 'hidden',
+      className: 'location-value',
+      dataset: {
+        question: questionData.question,
+        index: index,
+        type: 'location',
+        standard: isStandard ? 'true' : null,
+        dynamic: !isStandard ? 'true' : null
+      }
+    });
+    
+    // יצירת ממשק בחירת מיקום
+    const locationSelector = createElement('div', {
+      className: 'location-selector'
+    });
+    
+    // אפשרויות ברירת מחדל אם לא סופקו
+    const options = questionData.options || [
+      "ראש", "צוואר", "חזה", "גב עליון", "גב תחתון", 
+      "בטן עליונה", "בטן תחתונה", "יד ימין", "יד שמאל", 
+      "רגל ימין", "רגל שמאל", "אחר"
+    ];
+    
+    // יצירת לחצני בחירת מיקום
+    options.forEach(location => {
+      const locationButton = createElement('div', {
+        className: 'location-option',
+        text: location,
+        events: {
+          click: function() {
+            // הסרת הבחירה מכל האפשרויות
+            locationSelector.querySelectorAll('.location-option').forEach(opt => {
+              opt.classList.remove('selected');
+            });
+            
+            // סימון האפשרות הנבחרת
+            this.classList.add('selected');
+            
+            // עדכון הערך בשדה החבוי
+            hiddenInput.value = location;
+            
+            // הפעלת אירוע שינוי
+            const event = new Event('input', { bubbles: true });
+            hiddenInput.dispatchEvent(event);
+          }
+        }
+      });
+      
+      locationSelector.appendChild(locationButton);
+    });
+    
+    locationContainer.appendChild(locationSelector);
+    locationContainer.appendChild(hiddenInput);
+    container.appendChild(locationContainer);
+  }
 function updateMultiSelectValue(question, type, container) {
     const hiddenInput = container.querySelector(`.${type}-value`);
     if (!hiddenInput) return;
@@ -812,4 +883,513 @@ export function createAdvancedInjuryLocationSelector() {
     
     // אזור להצגת אזורי הגוף שנבחרו
     const selectedContainer = createElement('div', {
-        className: 'selecte
+        className: 'selected-parts-container',
+        innerHTML: '<h4>מיקומים שנבחרו:</h4>'
+    });
+    
+    // רשימת מיקומים שנבחרו
+    const selectedPartsList = createElement('ul', {
+        id: 'selected-body-parts',
+        className: 'selected-body-parts-list'
+    });
+    
+    // שדה קלט מוסתר לשמירת המיקומים הנבחרים
+    const hiddenInput = createElement('input', {
+        type: 'hidden',
+        id: 'injury-location-value',
+        dataset: {
+            question: 'מיקום הפציעה המדויק'
+        }
+    });
+    
+    selectedContainer.appendChild(selectedPartsList);
+    selectedContainer.appendChild(hiddenInput);
+    container.appendChild(selectedContainer);
+    
+    // הוספת שדה לתיאור ספציפי
+    const specificDetailsContainer = createElement('div', {
+        className: 'specific-details-container'
+    });
+    
+    const specificDetailsLabel = createElement('label', {
+        htmlFor: 'specific-injury-details',
+        text: 'פרטים נוספים על מיקום הפציעה:'
+    });
+    
+    const specificDetailsInput = createElement('input', {
+        type: 'text',
+        id: 'specific-injury-details',
+        className: 'specific-details-input',
+        placeholder: 'פרט מיקום מדויק, כגון: צד חיצוני של הקרסול, אזור מעל מפרק הברך...',
+        events: {
+            input: function() {
+                updateSelectedBodyParts();
+            }
+        }
+    });
+    
+    specificDetailsContainer.appendChild(specificDetailsLabel);
+    specificDetailsContainer.appendChild(specificDetailsInput);
+    container.appendChild(specificDetailsContainer);
+    
+    // פונקציה לטיפול בבחירת חלק גוף
+    function toggleBodyPartSelection(button, partId, partName) {
+        button.classList.toggle('selected');
+        
+        if (button.classList.contains('selected')) {
+            // הוספת חלק הגוף לרשימה
+            addBodyPartToList(partId, partName);
+        } else {
+            // הסרת חלק הגוף מהרשימה
+            removeBodyPartFromList(partId);
+        }
+        
+        // עדכון שדה הקלט המוסתר
+        updateSelectedBodyParts();
+    }
+    
+    // פונקציה להוספת חלק גוף לרשימה
+    function addBodyPartToList(partId, partName) {
+        const existingItem = document.getElementById(`selected-part-${partId}`);
+        
+        if (!existingItem) {
+            const listItem = createElement('li', {
+                id: `selected-part-${partId}`,
+                dataset: { partId }
+            });
+            
+            const itemContent = createElement('div', {
+                className: 'selected-part-content',
+                text: partName
+            });
+            
+            const removeButton = createElement('button', {
+                type: 'button',
+                className: 'remove-part-btn',
+                html: '&times;',
+                events: {
+                    click: function(e) {
+                        e.stopPropagation();
+                        removeBodyPartFromList(partId);
+                        
+                        // גם עדכון הכפתור המתאים למצב לא נבחר
+                        const button = document.querySelector(`.body-part-button[data-part-id="${partId}"]`);
+                        if (button) {
+                            button.classList.remove('selected');
+                        }
+                        
+                        updateSelectedBodyParts();
+                    }
+                }
+            });
+            
+            listItem.appendChild(itemContent);
+            listItem.appendChild(removeButton);
+            selectedPartsList.appendChild(listItem);
+        }
+    }
+    
+    // פונקציה להסרת חלק גוף מהרשימה
+    function removeBodyPartFromList(partId) {
+        const item = document.getElementById(`selected-part-${partId}`);
+        if (item) {
+            item.remove();
+        }
+    }
+    
+    // פונקציה לעדכון שדה הקלט המוסתר עם חלקי הגוף הנבחרים
+    function updateSelectedBodyParts() {
+        const selectedParts = Array.from(selectedPartsList.children).map(item => {
+            const content = item.querySelector('.selected-part-content');
+            return content ? content.textContent : '';
+        }).filter(Boolean);
+        
+        // הוספת פרטים ספציפיים אם קיימים
+        const specificDetails = document.getElementById('specific-injury-details').value.trim();
+        if (specificDetails) {
+            selectedParts.push(`פרטים נוספים: ${specificDetails}`);
+        }
+        
+        // אם אין מיקומים שנבחרו
+        if (selectedParts.length === 0) {
+            hiddenInput.value = '';
+            return;
+        }
+        
+        // עדכון הערך המוסתר
+        hiddenInput.value = selectedParts.join(', ');
+        
+        // אירוע שינוי לסימון שינויים בטופס
+        const event = new Event('input', { bubbles: true });
+        hiddenInput.dispatchEvent(event);
+    }
+    
+    // **שיפור חזותי** - יצירת ממשק מודרני ומשופר לבחירת מיקום פציעה
+    // עדכון מבנה לחצני בחירת חלקי גוף לפתרון בעיית היישור
+    const bodyPartButtonsContainer = document.querySelector('.body-part-selector');
+    if (bodyPartButtonsContainer) {
+        // מעדכן את ה-class לגריד משופר
+        bodyPartButtonsContainer.className = 'body-part-selector-grid';
+        
+        // מנקה את התוכן הקיים
+        bodyPartButtonsContainer.innerHTML = '';
+        
+        // יוצר מחדש את כל לחצני חלקי הגוף באופן מאורגן יותר
+        const bodyPartsOrganized = [
+            // ראש וצוואר
+            [
+                { id: 'head', name: 'ראש' },
+                { id: 'neck', name: 'צוואר' }
+            ],
+            // כתפיים
+            [
+                { id: 'shoulder-right', name: 'כתף ימין' },
+                { id: 'shoulder-left', name: 'כתף שמאל' }
+            ],
+            // זרועות
+            [
+                { id: 'arm-upper-right', name: 'זרוע ימין' },
+                { id: 'arm-upper-left', name: 'זרוע שמאל' }
+            ],
+            // מרפקים
+            [
+                { id: 'elbow-right', name: 'מרפק ימין' },
+                { id: 'elbow-left', name: 'מרפק שמאל' }
+            ],
+            // אמות
+            [
+                { id: 'arm-lower-right', name: 'אמה ימין' },
+                { id: 'arm-lower-left', name: 'אמה שמאל' }
+            ],
+            // שורשי כף יד
+            [
+                { id: 'wrist-right', name: 'שורש כף יד ימין' },
+                { id: 'wrist-left', name: 'שורש כף יד שמאל' }
+            ],
+            // כפות ידיים
+            [
+                { id: 'hand-right', name: 'כף יד ימין' },
+                { id: 'hand-left', name: 'כף יד שמאל' }
+            ],
+            // חזה וגב
+            [
+                { id: 'chest', name: 'חזה' },
+                { id: 'back-upper', name: 'גב עליון' },
+                { id: 'back-lower', name: 'גב תחתון' }
+            ],
+            // מפרקי ירך
+            [
+                { id: 'hip-right', name: 'מפרק ירך ימין' },
+                { id: 'hip-left', name: 'מפרק ירך שמאל' }
+            ],
+            // ירכיים
+            [
+                { id: 'leg-upper-right', name: 'ירך ימין' },
+                { id: 'leg-upper-left', name: 'ירך שמאל' }
+            ],
+            // ברכיים
+            [
+                { id: 'knee-right', name: 'ברך ימין' },
+                { id: 'knee-left', name: 'ברך שמאל' }
+            ],
+            // שוקיים
+            [
+                { id: 'leg-lower-right', name: 'שוק ימין' },
+                { id: 'leg-lower-left', name: 'שוק שמאל' }
+            ],
+            // קרסוליים
+            [
+                { id: 'ankle-right', name: 'קרסול ימין' },
+                { id: 'ankle-left', name: 'קרסול שמאל' }
+            ],
+            // כפות רגליים
+            [
+                { id: 'foot-right', name: 'כף רגל ימין' },
+                { id: 'foot-left', name: 'כף רגל שמאל' }
+            ]
+        ];
+
+        // יצירת קבוצות חלקי גוף עם עיצוב משופר
+        bodyPartsOrganized.forEach(group => {
+            const groupContainer = createElement('div', {
+                className: 'body-part-group'
+            });
+
+            group.forEach(part => {
+                // יצירת מכל לכל לחצן עם הסמל והטקסט
+                const buttonContainer = createElement('div', {
+                    className: 'body-part-button-container'
+                });
+
+                // יצירת הלחצן עצמו
+                const button = createElement('button', {
+                    type: 'button',
+                    className: 'body-part-button',
+                    dataset: { partId: part.id },
+                    events: {
+                        click: function() {
+                            toggleBodyPartSelection(this, part.id, part.name);
+                        }
+                    }
+                });
+
+                // הוספת סמל מתאים לחלק הגוף
+                const icon = createElement('span', {
+                    className: 'body-part-icon'
+                });
+                
+                // קביעת האייקון המתאים לפי סוג חלק הגוף
+                if (part.id.includes('head')) {
+                    icon.innerHTML = '<i class="fas fa-head-side"></i>';
+                } else if (part.id.includes('neck')) {
+                    icon.innerHTML = '<i class="fas fa-head-side-cough"></i>';
+                } else if (part.id.includes('shoulder')) {
+                    icon.innerHTML = '<i class="fas fa-user-injured"></i>';
+                } else if (part.id.includes('arm')) {
+                    icon.innerHTML = '<i class="fas fa-hand-point-up"></i>';
+                } else if (part.id.includes('hand') || part.id.includes('wrist')) {
+                    icon.innerHTML = '<i class="fas fa-hand-paper"></i>';
+                } else if (part.id.includes('chest')) {
+                    icon.innerHTML = '<i class="fas fa-lungs"></i>';
+                } else if (part.id.includes('back')) {
+                    icon.innerHTML = '<i class="fas fa-user"></i>';
+                } else if (part.id.includes('leg') || part.id.includes('knee') || part.id.includes('hip')) {
+                    icon.innerHTML = '<i class="fas fa-walking"></i>';
+                } else if (part.id.includes('foot') || part.id.includes('ankle')) {
+                    icon.innerHTML = '<i class="fas fa-shoe-prints"></i>';
+                } else {
+                    icon.innerHTML = '<i class="fas fa-circle"></i>';
+                }
+
+                // טקסט הלחצן
+                const text = createElement('span', {
+                    className: 'body-part-text',
+                    text: part.name
+                });
+
+                // הוספת רכיבים ללחצן
+                button.appendChild(icon);
+                button.appendChild(text);
+                buttonContainer.appendChild(button);
+                groupContainer.appendChild(buttonContainer);
+            });
+
+            bodyPartButtonsContainer.appendChild(groupContainer);
+        });
+    }
+
+    return container;
+}
+
+/**
+ * הוספת סגנונות CSS דינמיים למרכיב בחירת מיקום הפציעה
+ * נקרא אוטומטית בזמן טעינת הקובץ
+ */
+function addInjuryLocationStyles() {
+    // בדיקה אם הסגנונות כבר קיימים
+    if (document.getElementById('injury-location-styles')) {
+        return;
+    }
+
+    const styleElement = document.createElement('style');
+    styleElement.id = 'injury-location-styles';
+    styleElement.textContent = `
+        /* סגנונות משופרים לבורר מיקום פציעה */
+        .injury-location-container {
+            background-color: #f0f7ff;
+            border-radius: 12px;
+            padding: 20px;
+            margin: 20px 0;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+            max-width: 900px;
+        }
+        
+        .injury-location-container h3 {
+            color: #0056b3;
+            margin-top: 0;
+            margin-bottom: 15px;
+            font-size: 18px;
+            border-bottom: 2px solid #d0e3ff;
+            padding-bottom: 10px;
+        }
+        
+        .body-part-selector-grid {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            margin: 15px 0;
+        }
+        
+        .body-part-group {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            padding: 8px 10px;
+            background-color: rgba(255, 255, 255, 0.7);
+            border-radius: 8px;
+            border: 1px solid #e0e7f2;
+        }
+        
+        .body-part-button-container {
+            display: flex;
+            flex: 1;
+            min-width: 150px;
+        }
+        
+        .body-part-button {
+            display: flex;
+            align-items: center;
+            width: 100%;
+            padding: 10px 12px;
+            background-color: white;
+            border: 1px solid #d0e3ff;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+            text-align: right;
+        }
+        
+        .body-part-button:hover {
+            background-color: #f0f7ff;
+            transform: translateY(-2px);
+            box-shadow: 0 3px 6px rgba(0, 0, 0, 0.1);
+        }
+        
+        .body-part-button.selected {
+            background-color: #e8f4ff;
+            border-color: #0056b3;
+            color: #0056b3;
+            font-weight: bold;
+            box-shadow: 0 2px 8px rgba(0, 86, 179, 0.2);
+        }
+        
+        .body-part-icon {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 28px;
+            height: 28px;
+            margin-left: 10px;
+            background-color: #f0f7ff;
+            border-radius: 50%;
+            color: #0056b3;
+        }
+        
+        .body-part-text {
+            flex-grow: 1;
+        }
+        
+        .selected-parts-container {
+            background-color: white;
+            border-radius: 8px;
+            padding: 15px;
+            margin: 15px 0;
+            border: 1px solid #d0e3ff;
+        }
+        
+        .selected-parts-container h4 {
+            margin-top: 0;
+            margin-bottom: 10px;
+            color: #0056b3;
+            font-size: 16px;
+        }
+        
+        .selected-body-parts-list {
+            list-style: none;
+            padding: 0;
+            margin: 10px 0 0;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        
+        #selected-body-parts li {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 12px;
+            margin-bottom: 8px;
+            background-color: #e8f4ff;
+            border-radius: 6px;
+            color: #0056b3;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+            animation: fadeIn 0.3s ease;
+        }
+        
+        .selected-part-content {
+            flex: 1;
+        }
+        
+        .remove-part-btn {
+            background: none;
+            border: none;
+            color: #dc3545;
+            font-size: 18px;
+            cursor: pointer;
+            padding: 0 5px;
+            width: auto;
+            transition: all 0.2s ease;
+        }
+        
+        .remove-part-btn:hover {
+            color: #bd2130;
+            transform: scale(1.2);
+            box-shadow: none;
+        }
+        
+        .specific-details-container {
+            margin-top: 20px;
+        }
+        
+        .specific-details-container label {
+            font-weight: 600;
+            margin-bottom: 8px;
+            display: block;
+            color: #0056b3;
+        }
+        
+        .specific-details-input {
+            background-color: white;
+            border: 1px solid #d0e3ff;
+            border-radius: 8px;
+            padding: 12px;
+            width: 100%;
+            font-size: 16px;
+            transition: all 0.2s ease;
+        }
+        
+        .specific-details-input:focus {
+            border-color: #0056b3;
+            box-shadow: 0 0 0 3px rgba(0, 86, 179, 0.1);
+            outline: none;
+        }
+        
+        @media (max-width: 768px) {
+            .body-part-button-container {
+                min-width: 120px;
+            }
+        }
+        
+        @media (max-width: 480px) {
+            .body-part-button-container {
+                min-width: 100%;
+            }
+            
+            .body-part-group {
+                flex-direction: column;
+            }
+        }
+    `;
+    
+    document.head.appendChild(styleElement);
+}
+
+// הוספת הסגנונות בטעינת הקובץ
+addInjuryLocationStyles();
+
+// ייצוא פונקציות נדרשות
+export {
+    createQuestionElement,
+    createVitalSignsForm,
+    createAdvancedInjuryLocationSelector
+};

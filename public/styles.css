@@ -1666,3 +1666,108 @@
       font-size: 14px;
     }
   }
+  /* ===== תיקוני עיצוב למרכיב בחירת מיקום ===== */
+.location-container {
+  margin: 15px 0;
+}
+
+.location-selector {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+  gap: 10px;
+  margin: 15px 0;
+}
+
+.location-option {
+  width: 100%;
+  text-align: center;
+  padding: 10px;
+  background-color: var(--light-color);
+  border: 1px solid var(--border-light);
+  border-radius: var(--border-radius-small);
+  cursor: pointer;
+  transition: var(--transition-fast);
+}
+
+.location-option:hover {
+  background-color: #f0f7ff;
+  border-color: var(--primary-light);
+  transform: translateY(-2px);
+}
+
+.location-option.selected {
+  background-color: #e8f4ff;
+  border-color: var(--primary-color);
+  font-weight: bold;
+}
+
+/* תיקון תצוגת בחירה מרובה */
+.checkbox-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 10px 0;
+}
+
+.checkbox-option {
+  display: inline-flex;
+  align-items: center;
+  background-color: var(--light-color);
+  border: 1px solid var(--border-light);
+  border-radius: 25px;
+  padding: 8px 15px;
+  cursor: pointer;
+  transition: var(--transition-fast);
+  margin-bottom: 8px;
+}
+
+/* שיפור סולם דירוג */
+.scale-container {
+  margin: 15px 0;
+}
+
+.scale-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 10px 0;
+}
+
+/* שיפור השאלות */
+.question-item {
+  overflow: visible;
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+  margin-bottom: 20px;
+}
+
+/* כותרת לקבוצת שאלות */
+.questions-header {
+  margin-bottom: 20px;
+  padding-bottom: 10px;
+  border-bottom: 2px solid #f0f0f0;
+}
+
+.questions-header h3 {
+  color: var(--primary-color);
+  margin-bottom: 5px;
+}
+
+/* שיפור כללי לכל סוגי השאלות */
+.answer-container {
+  padding: 20px;
+}
+
+/* אנימציה חלקה לכל השאלות */
+.question-item {
+  opacity: 0;
+  transform: translateY(20px);
+  animation: fadeInUp 0.5s forwards;
+  animation-delay: calc(var(--index, 0) * 0.1s);
+}
+
+@keyframes fadeInUp {
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

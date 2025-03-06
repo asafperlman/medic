@@ -19,30 +19,161 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 // נתיבי API
 
-// קבלת שאלות דינמיות - מעודכן לתמיכה בניתוח תשובות קודמות
+// עדכון נקודת הקצה בקובץ server.js
 app.post('/api/dynamic-questions', async (req, res) => {
   try {
-    const patientRecord = req.body;
-    
+    const { patientInfo, standardAnswers } = req.body;
+
     // לוג אירוע אבטחה
     securityManager.logSecurityEvent({
       eventType: "api_access",
       endpoint: "/api/dynamic-questions",
       timestamp: new Date().toISOString()
     });
-    
-    // קבלת שאלות דינמיות מהמערכת - מעבירים גם את התשובות הקודמות לניתוח
-    const questions = medicalDataSystem.getDynamicQuestions(
-      patientRecord.patientInfo.mainComplaint,
-      patientRecord.standardAnswers || {}
+
+    // 1. שאלות מהמערכת המקומית (כגיבוי)
+    const localQuestions = medicalDataSystem.getDynamicQuestions(
+      patientInfo.mainComplaint,
+      standardAnswers || {}
     );
     
-    res.json({ questions });
+    // 2. שאלות מ-AI באמצעות ChatGPT
+    let aiQuestions = [];
+    let source = 'local';
+    
+    if (config.openai.apiKey) {
+      try {
+        // בניית פרומפט מובנה ומפורט לקבלת תשובות איכותיות
+        const prompt = `
+אתה רופא מומחה בעל ניסיון רב. המטופל הגיע עם התלונה העיקרית: "${patientInfo.mainComplaint}".
+
+פרטי המטופל:
+- גיל: ${patientInfo.age}
+- מין: ${patientInfo.gender === 'male' ? 'זכר' : 'נקבה'}
+- פרופיל רפואי: ${patientInfo.profile}
+- סעיפים רפואיים: ${patientInfo.medicalSections || "ללא סעיפים"}
+- אלרגיות: ${patientInfo.allergies || "ללא אלרגיות ידועות"}
+- תרופות קבועות: ${patientInfo.medications || "לא נוטל תרופות באופן קבוע"}
+- מעשן: ${patientInfo.smoking === 'yes' ? 'כן' : 'לא'}
+
+המטופל כבר ענה על השאלות הבאות:
+${Object.entries(standardAnswers)
+  .map(([q, a]) => `- ${q}: ${a}`)
+  .join('\n')}
+
+בהתבסס על המידע הזה, צור בדיוק 5 שאלות המשך מעמיקות וספציפיות שיעזרו להבין יותר לעומק את מצבו.
+השאלות צריכות להיות קשורות ישירות לתלונה ולתשובות הקודמות, ולחפש מידע קריטי.
+
+פורמט התשובה:
+החזר רק את השאלות עצמן, כל שאלה בשורה נפרדת, ללא מספור ועם סוג השאלה בסוגריים מרובעים בסוף כך:
+
+האם יש לך כאב בצד שמאל של הראש? [yesNo]
+מה עוצמת הכאב בסולם מ-1 עד 10? [scale]
+היכן בדיוק ממוקם הכאב ברקה? [location]
+מתי התחיל הכאב ומה משך הזמן שהוא נמשך? [duration]
+תאר בפירוט את אופי הכאב - פועם, חד, מתמשך וכו'. [multiline]
+
+סוגי השאלות האפשריים: yesNo, scale, multiline, multiselect, duration, value, location, characteristic.
+`;
+        
+        // שליחת הפרומפט ל-ChatGPT
+        const responseText = await llmService.sendPrompt(prompt);
+        
+        // פירוק התשובה לשאלות נפרדות
+        aiQuestions = parseAIResponse(responseText);
+        
+        if (aiQuestions.length > 0) {
+          source = 'ai';
+        }
+      } catch (error) {
+        console.error('שגיאה בקבלת שאלות מ-AI:', error);
+        // המשך עם שאלות מקומיות במקרה של שגיאה
+      }
+    }
+    
+    // 3. שילוב השאלות וסינון כפילויות
+    const combinedQuestions = combineQuestions(localQuestions, aiQuestions);
+    
+    res.json({
+      success: true,
+      questions: combinedQuestions,
+      source: source
+    });
   } catch (error) {
-    console.error('שגיאה בקבלת שאלות דינמיות:', error);
-    res.status(500).json({ error: 'שגיאה בהפקת שאלות דינמיות' });
+    console.error('שגיאה ביצירת שאלות דינמיות:', error);
+    res.status(500).json({ 
+      success: false, 
+      questions: medicalDataSystem.getDefaultDynamicQuestions(),
+      source: 'fallback'
+    });
   }
 });
+
+// פונקציית עזר - פירוק תשובת AI לשאלות
+function parseAIResponse(responseText) {
+  // חלוקה לשורות וסינון שורות ריקות
+  const lines = responseText.split('\n')
+    .map(line => line.trim())
+    .filter(line => line.length > 0 && line.includes('?'));
+  
+  return lines.map(line => {
+    // חילוץ סוג השאלה מסוגריים מרובעים אם קיימים
+    const typeMatch = line.match(/\[(.*?)\]$/);
+    const type = typeMatch ? typeMatch[1].trim() : 'multiline';
+    
+    // הסרת הסוגריים מטקסט השאלה
+    const questionText = line.replace(/\[.*?\]$/, '').trim();
+    
+    // בניית אובייקט השאלה
+    const question = {
+      type: type,
+      question: questionText
+    };
+    
+    // הוספת שדה followUp לשאלות מסוג yesNo
+    if (type === 'yesNo') {
+      question.followUp = 'אנא פרט';
+    }
+    
+    // הוספת אפשרויות לשאלות מסוג multiselect
+    if (type === 'multiselect') {
+      // אפשר להוסיף אפשרויות ברירת מחדל לפי התוכן
+      question.options = [];
+    }
+    
+    return question;
+  });
+}
+
+// פונקציית עזר - שילוב שאלות וסינון כפילויות
+function combineQuestions(localQuestions, aiQuestions) {
+  // מערך משולב
+  const combined = [...localQuestions];
+  
+  // הוספת שאלות AI, הימנעות מכפילויות
+  for (const aiQuestion of aiQuestions) {
+    // בדיקה אם השאלה דומה לשאלה קיימת
+    const isDuplicate = combined.some(q => 
+      areSimilarQuestions(q.question, aiQuestion.question)
+    );
+    
+    if (!isDuplicate) {
+      combined.push(aiQuestion);
+    }
+  }
+  
+  return combined;
+}
+
+// בדיקת דמיון בין שאלות
+function areSimilarQuestions(q1, q2) {
+  // בדיקת דמיון פשוטה
+  const normalize = text => text.toLowerCase().replace(/[.,?!]/g, '').trim();
+  const sim1 = normalize(q1);
+  const sim2 = normalize(q2);
+  
+  return sim1 === sim2 || sim1.includes(sim2) || sim2.includes(sim1);
+}
 
 // יצירת סיכום אנמנזה - מעודכן לתמיכה בפרופיל
 app.post('/api/generate-summary', async (req, res) => {
@@ -267,68 +398,161 @@ app.post('/api/dynamic-questions', async (req, res) => {
 // 1. עדכן את server.js להוספת נקודת קצה לשאלות דינמיות
 // הוסף למודול שרת Express הקיים:
 
-app.post('/api/get-dynamic-questions', async (req, res) => {
+// עדכון נקודת הקצה בקובץ server.js
+app.post('/api/dynamic-questions', async (req, res) => {
   try {
-    const { complaint, previousAnswers } = req.body;
-    
+    const { patientInfo, standardAnswers } = req.body;
+
     // לוג אירוע אבטחה
     securityManager.logSecurityEvent({
       eventType: "api_access",
-      endpoint: "/api/get-dynamic-questions",
+      endpoint: "/api/dynamic-questions",
       timestamp: new Date().toISOString()
     });
+
+    // 1. שאלות מהמערכת המקומית (כגיבוי)
+    const localQuestions = medicalDataSystem.getDynamicQuestions(
+      patientInfo.mainComplaint,
+      standardAnswers || {}
+    );
     
-    // בניית פרומפט לשאלות המשך
-    const prompt = `
-      התלונה העיקרית של המטופל/ת: "${complaint}"
-      
-      התשובות הקודמות שניתנו הן:
-      ${JSON.stringify(previousAnswers, null, 2)}
-      
-      אנא צור/י 3 עד 5 שאלות המשך רפואיות נוספות, רלוונטיות וממוקדות,
-      בעברית. כתוב/י כל שאלה בשורה חדשה, ללא מספור וללא פרטים נוספים.
-    `.trim();
+    // 2. שאלות מ-AI באמצעות ChatGPT
+    let aiQuestions = [];
+    let source = 'local';
     
-    // שליחת בקשה לשירות ה-LLM
-    const responseText = await llmService.sendPrompt(prompt);
+    if (config.openai.apiKey) {
+      try {
+        // בניית פרומפט מובנה ומפורט לקבלת תשובות איכותיות
+        const prompt = `
+אתה רופא מומחה בעל ניסיון רב. המטופל הגיע עם התלונה העיקרית: "${patientInfo.mainComplaint}".
+
+פרטי המטופל:
+- גיל: ${patientInfo.age}
+- מין: ${patientInfo.gender === 'male' ? 'זכר' : 'נקבה'}
+- פרופיל רפואי: ${patientInfo.profile}
+- סעיפים רפואיים: ${patientInfo.medicalSections || "ללא סעיפים"}
+- אלרגיות: ${patientInfo.allergies || "ללא אלרגיות ידועות"}
+- תרופות קבועות: ${patientInfo.medications || "לא נוטל תרופות באופן קבוע"}
+- מעשן: ${patientInfo.smoking === 'yes' ? 'כן' : 'לא'}
+
+המטופל כבר ענה על השאלות הבאות:
+${Object.entries(standardAnswers)
+  .map(([q, a]) => `- ${q}: ${a}`)
+  .join('\n')}
+
+בהתבסס על המידע הזה, צור בדיוק 5 שאלות המשך מעמיקות וספציפיות שיעזרו להבין יותר לעומק את מצבו.
+השאלות צריכות להיות קשורות ישירות לתלונה ולתשובות הקודמות, ולחפש מידע קריטי.
+
+פורמט התשובה:
+החזר רק את השאלות עצמן, כל שאלה בשורה נפרדת, ללא מספור ועם סוג השאלה בסוגריים מרובעים בסוף כך:
+
+האם יש לך כאב בצד שמאל של הראש? [yesNo]
+מה עוצמת הכאב בסולם מ-1 עד 10? [scale]
+היכן בדיוק ממוקם הכאב ברקה? [location]
+מתי התחיל הכאב ומה משך הזמן שהוא נמשך? [duration]
+תאר בפירוט את אופי הכאב - פועם, חד, מתמשך וכו'. [multiline]
+
+סוגי השאלות האפשריים: yesNo, scale, multiline, multiselect, duration, value, location, characteristic.
+`;
+        
+        // שליחת הפרומפט ל-ChatGPT
+        const responseText = await llmService.sendPrompt(prompt);
+        
+        // פירוק התשובה לשאלות נפרדות
+        aiQuestions = parseAIResponse(responseText);
+        
+        if (aiQuestions.length > 0) {
+          source = 'ai';
+        }
+      } catch (error) {
+        console.error('שגיאה בקבלת שאלות מ-AI:', error);
+        // המשך עם שאלות מקומיות במקרה של שגיאה
+      }
+    }
     
-    // פרסור התשובה לשאלות נפרדות
-    const lines = responseText.split('\n')
-      .map(line => line.trim())
-      .filter(Boolean)
-      .filter(line => line.endsWith('?'));
+    // 3. שילוב השאלות וסינון כפילויות
+    const combinedQuestions = combineQuestions(localQuestions, aiQuestions);
     
-    // יצירת מערך שאלות במבנה הנדרש
-    const gptQuestions = lines.map(question => ({
-      type: 'multiline',
-      question: question
-    }));
-    
-    // קבלת שאלות מקומיות סטנדרטיות
-    const localQuestions = medicalDataSystem.getDynamicQuestions(complaint, previousAnswers);
-    
-    // שילוב השאלות המקומיות והשאלות מ-ChatGPT
-    const combinedQuestions = [...localQuestions, ...gptQuestions];
-    
-    res.json({ 
-      success: true, 
+    res.json({
+      success: true,
       questions: combinedQuestions,
-      source: gptQuestions.length > 0 ? 'ai' : 'local'
+      source: source
     });
   } catch (error) {
-    console.error('שגיאה בקבלת שאלות מ-ChatGPT:', error);
-    
-    // במקרה של שגיאה, החזר רק שאלות מקומיות
-    const localQuestions = medicalDataSystem.getDynamicQuestions(complaint, previousAnswers);
-    
-    res.json({ 
-      success: true, 
-      questions: localQuestions,
-      source: 'local',
-      error: 'שימוש בשאלות מקומיות בשל שגיאה בקריאת API'
+    console.error('שגיאה ביצירת שאלות דינמיות:', error);
+    res.status(500).json({ 
+      success: false, 
+      questions: medicalDataSystem.getDefaultDynamicQuestions(),
+      source: 'fallback'
     });
   }
 });
+
+// פונקציית עזר - פירוק תשובת AI לשאלות
+function parseAIResponse(responseText) {
+  // חלוקה לשורות וסינון שורות ריקות
+  const lines = responseText.split('\n')
+    .map(line => line.trim())
+    .filter(line => line.length > 0 && line.includes('?'));
+  
+  return lines.map(line => {
+    // חילוץ סוג השאלה מסוגריים מרובעים אם קיימים
+    const typeMatch = line.match(/\[(.*?)\]$/);
+    const type = typeMatch ? typeMatch[1].trim() : 'multiline';
+    
+    // הסרת הסוגריים מטקסט השאלה
+    const questionText = line.replace(/\[.*?\]$/, '').trim();
+    
+    // בניית אובייקט השאלה
+    const question = {
+      type: type,
+      question: questionText
+    };
+    
+    // הוספת שדה followUp לשאלות מסוג yesNo
+    if (type === 'yesNo') {
+      question.followUp = 'אנא פרט';
+    }
+    
+    // הוספת אפשרויות לשאלות מסוג multiselect
+    if (type === 'multiselect') {
+      // אפשר להוסיף אפשרויות ברירת מחדל לפי התוכן
+      question.options = [];
+    }
+    
+    return question;
+  });
+}
+
+// פונקציית עזר - שילוב שאלות וסינון כפילויות
+function combineQuestions(localQuestions, aiQuestions) {
+  // מערך משולב
+  const combined = [...localQuestions];
+  
+  // הוספת שאלות AI, הימנעות מכפילויות
+  for (const aiQuestion of aiQuestions) {
+    // בדיקה אם השאלה דומה לשאלה קיימת
+    const isDuplicate = combined.some(q => 
+      areSimilarQuestions(q.question, aiQuestion.question)
+    );
+    
+    if (!isDuplicate) {
+      combined.push(aiQuestion);
+    }
+  }
+  
+  return combined;
+}
+
+// בדיקת דמיון בין שאלות
+function areSimilarQuestions(q1, q2) {
+  // בדיקת דמיון פשוטה
+  const normalize = text => text.toLowerCase().replace(/[.,?!]/g, '').trim();
+  const sim1 = normalize(q1);
+  const sim2 = normalize(q2);
+  
+  return sim1 === sim2 || sim1.includes(sim2) || sim2.includes(sim1);
+}
 
 
 // נתיב API חדש להמלצות טיפוליות מבוססות AI
@@ -401,129 +625,5 @@ app.post('/api/get-treatment-recommendations', async (req, res) => {
   }
 });
 
-// הוסף גם את הנתיב הבא
-app.post('/api/get-dynamic-questions', async (req, res) => {
-  try {
-    const { complaint, previousAnswers } = req.body;
-    
-    // לוג אירוע אבטחה
-    securityManager.logSecurityEvent({
-      eventType: "api_access",
-      endpoint: "/api/get-dynamic-questions",
-      timestamp: new Date().toISOString()
-    });
-    
-    // בניית פרומפט לשאלות המשך
-    const prompt = `
-      התלונה העיקרית של המטופל/ת: "${complaint}"
-      
-      התשובות הקודמות שניתנו הן:
-      ${JSON.stringify(previousAnswers, null, 2)}
-      
-      אנא צור/י 3 עד 5 שאלות המשך רפואיות נוספות, רלוונטיות וממוקדות,
-      בעברית. כתוב/י כל שאלה בשורה חדשה, ללא מספור וללא פרטים נוספים.
-    `.trim();
-    
-    // שליחת בקשה לשירות ה-LLM
-    const responseText = await llmService.sendPrompt(prompt);
-    
-    // פרסור התשובה לשאלות נפרדות
-    const lines = responseText.split('\n')
-      .map(line => line.trim())
-      .filter(Boolean)
-      .filter(line => line.endsWith('?'));
-    
-    // יצירת מערך שאלות במבנה הנדרש
-    const gptQuestions = lines.map(question => ({
-      type: 'multiline',
-      question: question
-    }));
-    
-    // קבלת שאלות מקומיות סטנדרטיות
-    const localQuestions = medicalDataSystem.getDynamicQuestions(complaint, previousAnswers);
-    
-    // שילוב השאלות המקומיות והשאלות מ-ChatGPT
-    const combinedQuestions = [...localQuestions, ...gptQuestions];
-    
-    res.json({ 
-      success: true, 
-      questions: combinedQuestions,
-      source: gptQuestions.length > 0 ? 'ai' : 'local'
-    });
-  } catch (error) {
-    console.error('שגיאה בקבלת שאלות מ-ChatGPT:', error);
-    
-    // במקרה של שגיאה, החזר רק שאלות מקומיות
-    const localQuestions = medicalDataSystem.getDynamicQuestions(req.body.complaint, req.body.previousAnswers);
-    
-    res.json({ 
-      success: true, 
-      questions: localQuestions,
-      source: 'local',
-      error: 'שימוש בשאלות מקומיות בשל שגיאה בקריאת API'
-    });
-  }
-});
+
 // הוסף לקובץ server.js
-app.post('/api/get-dynamic-questions', async (req, res) => {
-  try {
-    const { complaint, previousAnswers } = req.body;
-    
-    // לוג אירוע אבטחה
-    securityManager.logSecurityEvent({
-      eventType: "api_access",
-      endpoint: "/api/get-dynamic-questions",
-      timestamp: new Date().toISOString()
-    });
-    
-    // בניית פרומפט לשאלות המשך
-    const prompt = `
-      התלונה העיקרית של המטופל/ת: "${complaint}"
-      
-      התשובות הקודמות שניתנו הן:
-      ${JSON.stringify(previousAnswers, null, 2)}
-      
-      אנא צור/י 3 עד 5 שאלות המשך רפואיות נוספות, רלוונטיות וממוקדות,
-      בעברית. כתוב/י כל שאלה בשורה חדשה, ללא מספור וללא פרטים נוספים.
-    `.trim();
-    
-    // שליחת בקשה לשירות ה-LLM
-    const responseText = await llmService.sendPrompt(prompt);
-    
-    // פרסור התשובה לשאלות נפרדות
-    const lines = responseText.split('\n')
-      .map(line => line.trim())
-      .filter(Boolean)
-      .filter(line => line.endsWith('?'));
-    
-    // יצירת מערך שאלות במבנה הנדרש
-    const gptQuestions = lines.map(question => ({
-      type: 'multiline',
-      question: question
-    }));
-    
-    // קבלת שאלות מקומיות סטנדרטיות
-    const localQuestions = medicalDataSystem.getDynamicQuestions(complaint, previousAnswers);
-    
-    // שילוב השאלות המקומיות והשאלות מ-ChatGPT
-    const combinedQuestions = [...localQuestions, ...gptQuestions];
-    
-    res.json({ 
-      success: true, 
-      questions: combinedQuestions,
-      source: gptQuestions.length > 0 ? 'ai' : 'local'
-    });
-  } catch (error) {
-    console.error('שגיאה בקבלת שאלות מ-ChatGPT:', error);
-    
-    // במקרה של שגיאה, החזר רק שאלות מקומיות
-    const localQuestions = medicalDataSystem.getDynamicQuestions(req.body.complaint, req.body.previousAnswers);
-    
-    res.json({ 
-      success: true, 
-      questions: localQuestions,
-      source: 'local',
-      error: 'שימוש בשאלות מקומיות בשל שגיאה בקריאת API'
-    });
-  }
-});

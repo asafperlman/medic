@@ -32,43 +32,82 @@ const state = {
  * @param {number} stepNumber - מספר השלב להצגה
  * @param {boolean} skipConfirm - האם לדלג על אישור שינויים
  */
+/**
+ * פונקציה להצגת שלב מסוים, ממוטבת לביצועים
+ * @param {number} stepNumber - מספר השלב להצגה
+ * @param {boolean} skipConfirm - האם לדלג על אישור שינויים
+ */
 function showStep(stepNumber, skipConfirm = false) {
-    // בדיקת שינויים לא שמורים
-    if (!skipConfirm && state.unsavedChanges && state.currentStep !== stepNumber) {
-        const currentFormData = collectCurrentFormData();
-        const hasSignificantChanges = checkSignificantChanges(currentFormData);
-        
-        if (hasSignificantChanges) {
-            const confirmMove = confirm("יש לך שינויים שלא נשמרו. האם אתה בטוח שברצונך לעבור לשלב אחר?");
-            if (!confirmMove) {
-                return;
-            }
-        } else {
-            state.unsavedChanges = false;
-        }
+    // בדיקה אם אנחנו כבר בשלב הזה
+    if (state.currentStep === stepNumber) {
+      return;
     }
-
+    
+    // מעבר משלב 1 לשלב 2 מיוחד - כאן אנחנו תמיד שומרים את הנתונים
+    // לכן אין צורך באישור בכיוון זה
+    const isStep1to2 = (state.currentStep === 1 && stepNumber === 2);
+    
+    // בדיקת שינויים לא שמורים (רק אם לא במעבר משלב 1 ל-2)
+    if (!skipConfirm && !isStep1to2 && state.unsavedChanges) {
+      // בדיקה אם יש שינויים משמעותיים
+      const currentFormData = collectCurrentFormData();
+      const hasSignificantChanges = checkSignificantChanges(currentFormData);
+      
+      if (hasSignificantChanges) {
+        const confirmMove = confirm("יש לך שינויים שלא נשמרו. האם אתה בטוח שברצונך לעבור לשלב אחר?");
+        if (!confirmMove) {
+          return;
+        }
+      } else {
+        // אם אין שינויים משמעותיים, אפס את הדגל
+        state.unsavedChanges = false;
+      }
+    }
+  
     // הסתרת כל השלבים
     document.querySelectorAll('.step').forEach(step => {
-        step.classList.remove('active');
+      step.classList.remove('active');
     });
-
+  
     // הצגת השלב הנבחר
     const currentStepElement = document.getElementById(`step${stepNumber}`);
     if (currentStepElement) {
-        currentStepElement.classList.add('active');
+      currentStepElement.classList.add('active');
+      
+      // אנימציה חלקה להצגת השלב
+      currentStepElement.style.opacity = 0;
+      setTimeout(() => {
+        currentStepElement.style.opacity = 1;
+      }, 10);
     } else {
-        console.error(`לא נמצא אלמנט עבור שלב ${stepNumber}`);
-        return;
+      console.error(`לא נמצא אלמנט עבור שלב ${stepNumber}`);
+      return;
     }
-
+  
     // שמירת השלב הנוכחי
     state.currentStep = stepNumber;
-
+  
     // עדכון התצוגה
     updateProgressBar();
     updateButtonsVisibility();
-}
+  }
+  
+  /**
+   * טיפול במעבר משלב 1 לשלב 2
+   */
+  function handleStep1to2() {
+    // בדיקות ואיסוף נתונים כמו קודם...
+    
+    // ...
+    
+    // בסוף הפונקציה, אחרי שיצרת את הרשומה:
+    
+    // איפוס דגל השינויים - הכל נשמר עכשיו
+    state.unsavedChanges = false;
+    
+    // מעבר לשלב הבא עם דילוג על אישור
+    showStep(2, true);
+  }
 
 /**
  * בודק אם יש חיבור לשרת ומתאים את הממשק בהתאם
@@ -210,35 +249,74 @@ function loadStandardQuestions(complaint) {
  * @param {string} complaint - התלונה העיקרית
  * @param {object} previousAnswers - תשובות קודמות
  */
+/**
+ * טוען שאלות דינמיות בהתאם לתלונה ותשובות קודמות
+ * @param {string} complaint - התלונה העיקרית
+ * @param {object} previousAnswers - תשובות קודמות
+ */
 async function loadDynamicQuestions(complaint, previousAnswers) {
     try {
-        // קבלת שאלות מקומיות
-        let questions = dynamicQuestions.getLocalQuestionsForComplaint(complaint, previousAnswers);
+      // הצגת אנימציית טעינה
+      const loadingElement = getElement('#dynamic-questions-loading');
+      const containerElement = getElement('#dynamic-questions-container');
+      
+      if (loadingElement) loadingElement.style.display = 'block';
+      if (containerElement) containerElement.style.display = 'none';
+      
+      // הכנת נתונים לשליחה
+      const requestData = {
+        patientInfo: state.patientRecord.patientInfo,
+        standardAnswers: previousAnswers
+      };
+      
+      // שליחת בקשה לקבלת שאלות דינמיות
+      let questions = [];
+      
+      try {
+        const response = await fetch('/api/dynamic-questions', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(requestData)
+        });
         
-        // אם יש חיבור לאינטרנט וה-API מוגדר, נסה לקבל שאלות נוספות מה-AI
-        if (navigator.onLine && window.OPENAI_API_KEY) {
-            try {
-                const aiQuestions = await dynamicQuestions.getQuestionsFromAPI(complaint, previousAnswers);
-                if (aiQuestions && aiQuestions.length > 0) {
-                    questions = [...questions, ...aiQuestions];
-                }
-            } catch (error) {
-                console.warn("שגיאה בקבלת שאלות מ-AI:", error);
-            }
+        if (!response.ok) {
+          throw new Error(`שגיאת שרת: ${response.status}`);
         }
         
-        // וודא שיש לפחות כמה שאלות בסיסיות
-        if (!questions || questions.length === 0) {
-            questions = dynamicQuestions.getDefaultQuestions();
-        }
+        const data = await response.json();
         
-        return questions;
+        if (data.success !== false && data.questions && data.questions.length > 0) {
+          console.log(`התקבלו ${data.questions.length} שאלות ממקור: ${data.source}`);
+          questions = data.questions;
+        } else {
+          throw new Error("לא התקבלו שאלות מהשרת");
+        }
+      } catch (error) {
+        console.warn("שגיאה בקבלת שאלות מ-AI:", error);
+        // במקרה של כישלון, קבלת שאלות לוקליות
+        questions = dynamicQuestions.getLocalQuestionsForComplaint(complaint, previousAnswers);
+      }
+      
+      // וודא שיש שאלות גם במקרה של כישלון מוחלט
+      if (!questions || questions.length === 0) {
+        questions = dynamicQuestions.getDefaultQuestions();
+      }
+      
+      return questions;
     } catch (error) {
-        console.error("שגיאה בטעינת שאלות דינמיות:", error);
-        return dynamicQuestions.getDefaultQuestions();
+      console.error("שגיאה כללית בטעינת שאלות דינמיות:", error);
+      return dynamicQuestions.getDefaultQuestions();
+    } finally {
+      // הסתרת אנימציית הטעינה בכל מקרה
+      const loadingElement = getElement('#dynamic-questions-loading');
+      const containerElement = getElement('#dynamic-questions-container');
+      
+      if (loadingElement) loadingElement.style.display = 'none';
+      if (containerElement) containerElement.style.display = 'block';
     }
-}
-
+  }
 /**
  * הצגת שאלות דינמיות בממשק
  * @param {Array} questions - השאלות להצגה
